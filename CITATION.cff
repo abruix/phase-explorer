@@ -1,1 +1,17 @@
-
+cff-version: 1.2.0
+title: "Phase Diagram Explorer"
+message: "If you use this tool, please cite it as below."
+type: software
+authors:
+  - family-names: Bruix Fusté
+    given-names: Albert
+    affiliation: "Universitat de Barcelona / IQTCUB"
+    email: abruix@ub.edu
+    orcid: "https://orcid.org/YOUR-ORCID-HERE"
+license: CC-BY-4.0
+url: "https://abruix.github.io/phase-explorer/"
+abstract: >
+  An interactive single-page phase diagram explorer for water, CO₂,
+  and isobutane. Tap or click any point on the P–T diagram to read
+  the phase and thermodynamic properties (density, enthalpy, entropy,
+  Gibbs free energy). Built for pedagogical use.
