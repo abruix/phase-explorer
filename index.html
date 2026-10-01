@@ -87,6 +87,25 @@
   table.compare td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
   table.compare td:first-child{text-align:left;color:var(--sub);font-weight:500;}
   table.compare td.match{color:var(--accent2);}
+
+  /* top-level mode switch (single component vs binary mixture) */
+  .mode-toggle{display:flex;justify-content:center;gap:0;margin:14px auto 2px;max-width:460px;
+    border:1px solid var(--line);border-radius:999px;overflow:hidden;background:#fff;}
+  .mode-btn{flex:1;border:none;background:transparent;color:var(--ink);
+    padding:9px 10px;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .15s ease;}
+  .mode-btn.active{background:var(--accent2);color:#fff;}
+  /* binary controls */
+  .bin-controls{display:flex;flex-wrap:wrap;gap:12px 18px;margin-bottom:14px;}
+  .ctrl-group{display:flex;flex-direction:column;gap:5px;}
+  .ctrl-label{font-size:.68rem;letter-spacing:.4px;text-transform:uppercase;color:var(--sub);font-weight:700;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;flex-wrap:wrap;}
+  .seg button{border:none;background:transparent;color:var(--ink);padding:7px 11px;
+    font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap;border-right:1px solid var(--line);}
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent);color:#fff;}
+  .ctrl-group.disabled{opacity:.4;pointer-events:none;}
+  .ctrl-group.disabled .seg button.active{background:#b8b0a0;}
+  .bin-note{font-size:.72rem;color:var(--sub);font-style:italic;align-self:flex-end;}
 </style>
 </head>
 <body>
@@ -100,6 +119,12 @@
     </div>
   </header>
 
+  <div class="mode-toggle" id="modeToggle">
+    <button class="mode-btn active" data-mode="single">Single component</button>
+    <button class="mode-btn" data-mode="binary">Binary mixture</button>
+  </div>
+
+  <div id="viewSingle">
   <div class="tabs">
     <button class="tab active" data-sub="water">Water (H&#8322;O)</button>
     <button class="tab" data-sub="co2">Carbon Dioxide (CO&#8322;)</button>
@@ -141,6 +166,75 @@
       </div>
     </div>
   </div>
+  </div><!-- /viewSingle -->
+
+  <div id="viewBinary" style="display:none;">
+    <div class="card bin-controls">
+      <div class="ctrl-group">
+        <span class="ctrl-label" id="lblAxis">Diagram</span>
+        <div class="seg" id="segAxis">
+          <button data-ax="Tx" class="active">T &ndash; x</button>
+          <button data-ax="px">p &ndash; x</button>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label" id="lblMisc">Liquids</span>
+        <div class="seg" id="segMisc">
+          <button data-m="mix" class="active">Miscible</button>
+          <button data-m="partial">Partially miscible</button>
+        </div>
+      </div>
+      <div class="ctrl-group" id="grpUCST" style="display:none;">
+        <span class="ctrl-label" id="lblUCST">Critical solution T</span>
+        <div class="seg" id="segUCST">
+          <button data-u="below" class="active">Below lowest b.p.</button>
+          <button data-u="above">Above lowest b.p.</button>
+        </div>
+      </div>
+      <div class="ctrl-group" id="grpDev">
+        <span class="ctrl-label" id="lblDev">Deviation from ideality</span>
+        <div class="seg" id="segDev">
+          <button data-d="ideal" class="active">Ideal</button>
+          <button data-d="slight">Slightly non-ideal</button>
+          <button data-d="azeo">Azeotrope</button>
+        </div>
+      </div>
+      <div class="ctrl-group" id="grpAzeo" style="display:none;">
+        <span class="ctrl-label" id="lblAzeo">Azeotrope type</span>
+        <div class="seg" id="segAzeo">
+          <button data-z="min" class="active">Minimum-boiling</button>
+          <button data-z="max">Maximum-boiling</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="diagram-col">
+        <div class="card diagram-card">
+          <div id="bhint">tap / click the diagram to explore &#8594;</div>
+          <canvas id="bplot"></canvas>
+          <div class="legend" id="blegend">
+            <span><i class="swatch" style="background:var(--liquid)"></i><span id="blegLiquid">Liquid</span></span>
+            <span><i class="swatch" style="background:var(--gas)"></i><span id="blegVapor">Vapour</span></span>
+            <span><i class="swatch" style="background:#efe4d0"></i><span id="blegTwo">Liquid + vapour</span></span>
+            <span><i class="swatch" style="background:var(--sc)"></i><span id="blegLL">Two liquids</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-col">
+        <div class="card">
+          <div class="phase-badge" id="bPhaseBadge">Tap the diagram<span class="sub">to select a state</span></div>
+          <div id="bMolWrap" style="display:flex;justify-content:center;margin-bottom:10px;">
+            <canvas id="bmol" width="180" height="104" style="background:#fafaf5;border:1px solid var(--line);border-radius:8px;"></canvas>
+          </div>
+          <div id="bCoexNote" class="coex-note" style="display:none;"></div>
+          <div id="bPropsWrap"></div>
+          <div class="facts" id="bFacts"></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /viewBinary -->
 
   <footer id="footerNote"></footer>
 </div>
@@ -938,6 +1032,7 @@ function applyLanguage(){
     document.getElementById('propsWrap').innerHTML = buildSingleTable();
   }
   draw();
+  if (typeof applyLanguageBinary === 'function') applyLanguageBinary();
 }
 document.getElementById('langToggle').addEventListener('click', (e)=>{
   const btn = e.target.closest('.lang-btn');
@@ -964,8 +1059,542 @@ document.querySelectorAll('.tab').forEach(tab=>{
   });
 });
 
+/* =======================================================================
+   BINARY TWO-COMPONENT LIQUID-VAPOUR module
+   Generic pair A (b.p. 60 C, more volatile) + B (b.p. 90 C). Vapour
+   pressures from Clausius-Clapeyron anchored at each normal boiling point;
+   non-ideality from a one-parameter (symmetric) Margules model. The whole
+   model and its region classifier were validated numerically before being
+   transcribed here (see commit history / _validate.py).
+   ======================================================================= */
+const BIN = {
+  R:8.314, P0:1.01325,
+  TbA:333.15, TbB:363.15,     // A boils 60C, B boils 90C
+  Tref:348.15,                // p-x isotherm (75 C)
+  ALPHA_SLIGHT:0.6, ALPHA_AZEO:1.8,
+  UCST_BELOW:320, UCST_ABOVE:380,
+  axis:'Tx', misc:'mix', ucst:'below', dev:'ideal', azeo:'min',
+  selected:null, T3:null, started:false
+};
+BIN.LA=88*BIN.TbA; BIN.LB=88*BIN.TbB; BIN.Pref=BIN.P0;
+BIN.pA=function(T){return this.P0*Math.exp(-(this.LA/this.R)*(1/T-1/this.TbA));};
+BIN.pB=function(T){return this.P0*Math.exp(-(this.LB/this.R)*(1/T-1/this.TbB));};
+BIN.Gpar=function(){return 2*this.R*(this.ucst==='below'?this.UCST_BELOW:this.UCST_ABOVE);};
+BIN.alpha=function(T){
+  if(this.misc==='partial') return this.Gpar()/(this.R*T);
+  if(this.dev==='ideal') return 0;
+  if(this.dev==='slight') return this.ALPHA_SLIGHT;
+  return this.azeo==='min'?this.ALPHA_AZEO:-this.ALPHA_AZEO;
+};
+BIN.Pmix=function(x,T){const a=this.alpha(T);return (1-x)*Math.exp(a*x*x)*this.pA(T)+x*Math.exp(a*(1-x)*(1-x))*this.pB(T);};
+BIN.yVap=function(x,T){const a=this.alpha(T);const P=this.Pmix(x,T);return x*Math.exp(a*(1-x)*(1-x))*this.pB(T)/P;};
+BIN.bubbleT=function(x){let lo=250,hi=430;for(let i=0;i<70;i++){const m=(lo+hi)/2;if(this.Pmix(x,m)>this.Pref)hi=m;else lo=m;}return (lo+hi)/2;};
+BIN.binodal=function(T){
+  const a=this.alpha(T); if(a<=2) return null;
+  const f=x=>Math.log((1-x)/x)-a*(1-2*x);
+  const n=400; let prev=null,px=null;
+  for(let i=0;i<=n;i++){const x=1e-4+i*(0.5-2e-4)/n;const v=f(x);
+    if(prev!==null&&prev*v<0){let aa=px,bb=x;for(let k=0;k<50;k++){const m=(aa+bb)/2;if(f(aa)*f(m)<0)bb=m;else aa=m;}return (aa+bb)/2;}
+    prev=v;px=x;}
+  return null;
+};
+BIN.threephaseT=function(){
+  if(this.misc!=='partial') return null;
+  let lo=250,hi=this.TbB;
+  for(let i=0;i<70;i++){const m=(lo+hi)/2;const xb=this.binodal(m);
+    if(xb===null){hi=m;continue;}
+    if(this.Pmix(xb,m)>this.Pref)hi=m;else lo=m;}
+  return (lo+hi)/2;
+};
+BIN.bubbleCompsTarget=function(target,T){
+  const gap=this.binodal(T); const roots=[]; const n=600; let prev=null,px=null;
+  for(let i=0;i<=n;i++){const x=i/n;
+    if(gap!==null&&x>gap&&x<1-gap){prev=null;px=null;continue;}
+    const v=this.Pmix(x,T)-target;
+    if(prev!==null&&px!==null&&prev*v<=0){let aa=px,bb=x;
+      for(let k=0;k<50;k++){const m=(aa+bb)/2;if((this.Pmix(aa,T)-target)*(this.Pmix(m,T)-target)<0)bb=m;else aa=m;}
+      roots.push((aa+bb)/2);}
+    prev=v;px=x;}
+  return roots;
+};
+BIN.refresh=function(){ this.T3=this.threephaseT(); };
+
+// state at overall composition z (=mole fraction of B) and a y-value
+// (temperature in C for T-x, pressure in bar for p-x)
+BIN.stateAt=function(z,yval){
+  const isTx=this.axis==='Tx';
+  const T=isTx?(yval+273.15):this.Tref;
+  const sysP=isTx?this.Pref:yval;
+  // liquid-liquid region
+  if(this.misc==='partial'){
+    const underLine = isTx ? (this.T3!==null && T<this.T3) : false;
+    const g=this.binodal(T);
+    if(isTx && underLine){
+      if(g!==null && z>=g && z<=1-g){const fa=((1-g)-z)/((1-g)-g);return {kind:'LL',a:g,b:1-g,fa:fa,fb:1-fa,z:z};}
+      return {kind:'L',z:z};
+    }
+    if(!isTx && g!==null && z>=g && z<=1-g){
+      const Pplat=this.Pmix(g,T);
+      if(sysP>=Pplat){const fa=((1-g)-z)/((1-g)-g);return {kind:'LL',a:g,b:1-g,fa:fa,fb:1-fa,z:z};}
+    }
+  }
+  if(this.Pmix(z,T)<=sysP) return {kind:'L',z:z};
+  const roots=this.bubbleCompsTarget(sysP,T);
+  for(const xL of roots){
+    const yV=this.yVap(xL,T);
+    const lo=Math.min(xL,yV),hi=Math.max(xL,yV);
+    if(z>=lo&&z<=hi){
+      const fLiq=Math.abs(xL-yV)<1e-9?1:Math.abs(z-yV)/Math.abs(xL-yV);
+      return {kind:'LV',xL:xL,yV:yV,fLiq:fLiq,fVap:1-fLiq,z:z};
+    }
+  }
+  return {kind:'V',z:z};
+};
+
+/* ---------- binary i18n ---------- */
+const BSTR={
+  modeSingle:{en:"Single component",ca:"Un component"},
+  modeBinary:{en:"Binary mixture",ca:"Mescla binaria"},
+  lblAxis:{en:"Diagram",ca:"Diagrama"},
+  lblMisc:{en:"Liquids",ca:"Liquids"},
+  lblUCST:{en:"Critical solution T",ca:"T critica de dissolucio"},
+  lblDev:{en:"Deviation from ideality",ca:"Desviacio de la idealitat"},
+  lblAzeo:{en:"Azeotrope type",ca:"Tipus d'azeotrop"},
+  axTx:{en:"T &ndash; x (const. p)",ca:"T &ndash; x (p const.)"},
+  axpx:{en:"p &ndash; x (const. T)",ca:"p &ndash; x (T const.)"},
+  mMix:{en:"Miscible",ca:"Miscibles"},
+  mPartial:{en:"Partially miscible",ca:"Parcialment miscibles"},
+  uBelow:{en:"Below lowest b.p.",ca:"Sota el p.e. mes baix"},
+  uAbove:{en:"Above lowest b.p.",ca:"Sobre el p.e. mes baix"},
+  dIdeal:{en:"Ideal",ca:"Ideal"},
+  dSlight:{en:"Slightly non-ideal",ca:"Lleugerament no ideal"},
+  dAzeo:{en:"Azeotrope",ca:"Azeotrop"},
+  zMin:{en:"Minimum-boiling",ca:"D'ebullicio minima"},
+  zMax:{en:"Maximum-boiling",ca:"D'ebullicio maxima"},
+  legLiquid:{en:"Liquid",ca:"Liquid"},
+  legVapor:{en:"Vapour",ca:"Vapor"},
+  legTwo:{en:"Liquid + vapour",ca:"Liquid + vapor"},
+  legLL:{en:"Two liquids",ca:"Dos liquids"},
+  hint:{en:"tap / click the diagram to explore &#8594;",ca:"toca / clica el diagrama per explorar &#8594;"},
+  capTx:{en:"at constant p = 1 atm",ca:"a p constant = 1 atm"},
+  cappx:{en:"at constant T = 75 &deg;C",ca:"a T constant = 75 &deg;C"},
+  axisX:{en:"xB  —  mole fraction of B",
+          ca:"xB  —  fraccio molar de B"},
+  axisT:{en:"Temperature (&deg;C)",ca:"Temperatura (&deg;C)"},
+  axisP:{en:"Pressure (bar)",ca:"Pressio (bar)"},
+  tapPrompt:{en:"Tap the diagram",ca:"Toca el diagrama"},
+  tapSub:{en:"to read the phases present",ca:"per llegir les fases presents"},
+  phaseLiquid:{en:"Liquid (one phase)",ca:"Liquid (una fase)"},
+  phaseVapor:{en:"Vapour (one phase)",ca:"Vapor (una fase)"},
+  phaseLV:{en:"Liquid + vapour",ca:"Liquid + vapor"},
+  phaseLL:{en:"Two liquid phases",ca:"Dues fases liquides"},
+  phaseLLV:{en:"Two liquids + vapour (3-phase line)",ca:"Dos liquids + vapor (linia trifasica)"},
+  colLiquid:{en:"Liquid",ca:"Liquid"},
+  colVapor:{en:"Vapour",ca:"Vapor"},
+  colL1:{en:"Liquid 1",ca:"Liquid 1"},
+  colL2:{en:"Liquid 2",ca:"Liquid 2"},
+  rowComp:{en:"Composition x<sub>B</sub>",ca:"Composicio x<sub>B</sub>"},
+  rowAmount:{en:"Amount (mol % of system)",ca:"Quantitat (mol % del sistema)"},
+  overall:{en:"Overall composition",ca:"Composicio global"},
+  threeAmt:{en:"On the three-phase line the compositions are fixed, but the amount of each phase depends on the overall composition (it is an invariant line).",
+            ca:"A la linia trifasica les composicions son fixes, pero la quantitat de cada fase depen de la composicio global (es una linia invariant)."},
+  noteLV:{en:"Liquid and vapour coexist. A horizontal <b>tie line</b> joins the two compositions in equilibrium; the vapour is always richer in the more volatile component. The <b>lever rule</b> fixes how much of each phase is present.",
+          ca:"Coexisteixen liquid i vapor. Una <b>linia de connexio</b> horitzontal uneix les dues composicions en equilibri; el vapor sempre es mes ric en el component mes volatil. La <b>regla de la palanca</b> fixa quanta quantitat hi ha de cada fase."},
+  noteLL:{en:"Below the critical solution temperature the liquids split into <b>two layers</b> of fixed composition (the ends of the tie line). Their relative amounts follow the lever rule.",
+          ca:"Per sota de la temperatura critica de dissolucio els liquids se separen en <b>dues capes</b> de composicio fixa (els extrems de la linia de connexio). Les quantitats relatives segueixen la regla de la palanca."},
+  noteAz:{en:"At the azeotrope the bubble and dew curves touch: liquid and vapour have the <b>same composition</b>, so simple distillation cannot cross it.",
+          ca:"A l'azeotrop les corbes d'ebullicio i de rosada es toquen: liquid i vapor tenen la <b>mateixa composicio</b>, de manera que la destil-lacio simple no el pot creuar."},
+  noteHetero:{en:"Along the horizontal line <b>two liquids and a vapour</b> coexist at once (a heteroazeotrope). It is the two-component analogue of a triple point.",
+              ca:"Al llarg de la linia horitzontal coexisteixen alhora <b>dos liquids i un vapor</b> (un heteroazeotrop). Es l'analeg a dos components d'un punt triple."}
+};
+const BFACTS={
+  base:{en:"Component <b>A</b> boils at 60&nbsp;&deg;C and <b>B</b> at 90&nbsp;&deg;C, so A is the more volatile. The x-axis runs from pure A (left) to pure B (right).",
+        ca:"El component <b>A</b> bull a 60&nbsp;&deg;C i el <b>B</b> a 90&nbsp;&deg;C, de manera que A es el mes volatil. L'eix x va de A pur (esquerra) a B pur (dreta)."},
+  ideal:{en:"<b>Ideal (Raoult's law).</b> The bubble (liquid) line is straight; the dew (vapour) line bows away from it. The vapour is always enriched in the more volatile A &mdash; the basis of distillation.",
+         ca:"<b>Ideal (llei de Raoult).</b> La linia d'ebullicio (liquid) es recta; la de rosada (vapor) se'n separa corbant-se. El vapor sempre s'enriqueix en el mes volatil A &mdash; la base de la destil-lacio."},
+  slight:{en:"<b>Slightly non-ideal.</b> Weak positive deviations from Raoult's law curve the bubble line, but not enough to create an azeotrope. Distillation can still reach both pure components.",
+          ca:"<b>Lleugerament no ideal.</b> Desviacions positives febles de la llei de Raoult corben la linia d'ebullicio, pero no prou per crear un azeotrop. La destil-lacio encara pot arribar als dos components purs."},
+  azmin:{en:"<b>Minimum-boiling azeotrope.</b> Strong positive deviations push the mixture to boil <i>below</i> both pure components. At the azeotrope vapour and liquid share one composition, trapping distillation there (e.g. ethanol&ndash;water).",
+         ca:"<b>Azeotrop d'ebullicio minima.</b> Desviacions positives fortes fan que la mescla bulli <i>per sota</i> dels dos components purs. A l'azeotrop vapor i liquid tenen la mateixa composicio, cosa que hi atrapa la destil-lacio (p.&nbsp;ex. etanol&ndash;aigua)."},
+  azmax:{en:"<b>Maximum-boiling azeotrope.</b> Strong negative deviations make the mixture boil <i>above</i> both pure components (e.g. acetone&ndash;chloroform, nitric acid&ndash;water).",
+         ca:"<b>Azeotrop d'ebullicio maxima.</b> Desviacions negatives fortes fan que la mescla bulli <i>per sobre</i> dels dos components purs (p.&nbsp;ex. acetona&ndash;cloroform, acid nitric&ndash;aigua)."},
+  pbelow:{en:"<b>Partially miscible, UCST below the boiling range.</b> Near boiling the liquids mix completely and form a homogeneous minimum-boiling azeotrope; only on cooling (inside the dome) do they split into two layers.",
+          ca:"<b>Parcialment miscibles, UCST sota el rang d'ebullicio.</b> A prop de l'ebullicio els liquids es barregen del tot i formen un azeotrop homogeni d'ebullicio minima; nomes en refredar (dins la cupula) se separen en dues capes."},
+  pabove:{en:"<b>Partially miscible, UCST above the boiling range.</b> The liquids never fully mix before boiling, so the diagram shows a <b>heteroazeotrope</b>: a horizontal three-phase line where two liquids and vapour coexist (e.g. water&ndash;1-butanol).",
+          ca:"<b>Parcialment miscibles, UCST sobre el rang d'ebullicio.</b> Els liquids no es barregen del tot abans de bullir, aixi que el diagrama mostra un <b>heteroazeotrop</b>: una linia trifasica horitzontal on coexisteixen dos liquids i vapor (p.&nbsp;ex. aigua&ndash;1-butanol)."}
+};
+function binFactKey(){
+  if(BIN.misc==='partial') return BIN.ucst==='below'?'pbelow':'pabove';
+  if(BIN.dev==='ideal') return 'ideal';
+  if(BIN.dev==='slight') return 'slight';
+  return BIN.azeo==='min'?'azmin':'azmax';
+}
+
+/* ---------- binary canvas ---------- */
+const bcanvas=document.getElementById('bplot'), bctx=bcanvas.getContext('2d');
+const bmargin={left:54,right:16,top:22,bottom:40};
+let bplotW=0,bplotH=0,bDPR=1;
+BIN.yRange=function(){
+  if(this.axis==='px') return [0.4,2.0];
+  return this.misc==='partial'?[30,100]:[45,100];
+};
+function bxToPx(z){ return bmargin.left+z*bplotW; }
+function bpxToX(px){ return (px-bmargin.left)/bplotW; }
+function byToPx(v){ const r=BIN.yRange(); return bmargin.top+(1-(v-r[0])/(r[1]-r[0]))*bplotH; }
+function bpxToY(px){ const r=BIN.yRange(); return r[0]+(1-(px-bmargin.top)/bplotH)*(r[1]-r[0]); }
+
+function bresize(){
+  const rect=bcanvas.parentElement.getBoundingClientRect();
+  const cssW=rect.width-24; if(cssW<=0) return;
+  const cssH=Math.max(320,Math.min(460,cssW*0.72));
+  bDPR=window.devicePixelRatio||1;
+  bcanvas.style.width=cssW+"px"; bcanvas.style.height=cssH+"px";
+  bcanvas.width=Math.round(cssW*bDPR); bcanvas.height=Math.round(cssH*bDPR);
+  bctx.setTransform(bDPR,0,0,bDPR,0,0);
+  bplotW=cssW-bmargin.left-bmargin.right; bplotH=cssH-bmargin.top-bmargin.bottom;
+  bdraw();
+}
+
+const BKIND_COLOR={L:'--liquid',V:'--gas'};
+function bkindFill(k){
+  if(k==='LV') return '#efe4d0';
+  if(k==='LL') return cssVar('--sc');
+  return cssVar(BKIND_COLOR[k]);
+}
+function bcurvesTx(){
+  const bubble=[],dew=[]; const N=280;
+  for(let i=0;i<=N;i++){const xL=i/N;const T=BIN.bubbleT(xL);const g=BIN.binodal(T);
+    if(g!==null&&xL>g&&xL<1-g){bubble.push(null);dew.push(null);continue;}
+    bubble.push({x:xL,y:T-273.15}); dew.push({x:BIN.yVap(xL,T),y:T-273.15});}
+  return {bubble,dew};
+}
+function bcurvesPx(){
+  const bubble=[],dew=[]; const T=BIN.Tref; const N=280; const g=BIN.binodal(T);
+  for(let i=0;i<=N;i++){const xL=i/N;
+    if(g!==null&&xL>g&&xL<1-g){bubble.push(null);dew.push(null);continue;}
+    const P=BIN.Pmix(xL,T); bubble.push({x:xL,y:P}); dew.push({x:BIN.yVap(xL,T),y:P});}
+  return {bubble,dew};
+}
+function bstroke(pts,color,width){
+  bctx.beginPath(); let started=false;
+  for(const p of pts){
+    if(p===null){started=false;continue;}
+    const px=bxToPx(p.x),py=byToPx(p.y);
+    if(!started){bctx.moveTo(px,py);started=true;} else bctx.lineTo(px,py);
+  }
+  bctx.strokeStyle=color; bctx.lineWidth=width; bctx.lineJoin="round"; bctx.stroke();
+}
+
+function bdraw(){
+  if(bplotW<=0) return;
+  bctx.clearRect(0,0,bcanvas.width,bcanvas.height);
+  bctx.save();
+  bctx.fillStyle="#fffdf8"; bctx.fillRect(bmargin.left,bmargin.top,bplotW,bplotH);
+
+  // shaded regions
+  const cols=84,rows=54;
+  for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){
+    const z=(i+0.5)/cols;
+    const px0=bmargin.left+i/cols*bplotW, py0=bmargin.top+j/rows*bplotH;
+    const w=bplotW/cols+0.6,h=bplotH/rows+0.6;
+    const yval=bpxToY(py0+h/2);
+    bctx.fillStyle=bkindFill(BIN.stateAt(z,yval).kind);
+    bctx.fillRect(px0,py0,w,h);
+  }
+
+  // bubble / dew curves
+  const C=BIN.axis==='Tx'?bcurvesTx():bcurvesPx();
+  bstroke(C.dew, cssVar('--gas-line'), 3);
+  bstroke(C.bubble, cssVar('--liquid-line'), 3);
+
+  // liquid-liquid binodal + three-phase line (partial miscibility)
+  if(BIN.misc==='partial'){
+    if(BIN.axis==='Tx'){
+      const top=BIN.T3, r=BIN.yRange(); const left=[],right=[];
+      for(let T=r[0];T<=top-273.15+0.01;T+=0.5){const g=BIN.binodal(T+273.15);
+        if(g===null){left.push(null);right.push(null);} else {left.push({x:g,y:T});right.push({x:1-g,y:T});}}
+      bstroke(left, cssVar('--sc-line'),2.4); bstroke(right, cssVar('--sc-line'),2.4);
+      if(BIN.ucst==='above'){
+        const g=BIN.binodal(top), Tc=top-273.15;
+        bctx.setLineDash([]); bstroke([{x:g,y:Tc},{x:1-g,y:Tc}], cssVar('--sc-line'),2.8);
+        const y3=BIN.yVap(g,top);               // vapour point on the 3-phase line
+        bctx.beginPath(); bctx.arc(bxToPx(y3),byToPx(Tc),4,0,7); bctx.fillStyle=cssVar('--gas-line'); bctx.fill();
+        bctx.lineWidth=1.3; bctx.strokeStyle="#fff"; bctx.stroke();
+      }
+    } else {
+      const g=BIN.binodal(BIN.Tref);
+      if(g!==null){
+        const Pplat=BIN.Pmix(g,BIN.Tref), r=BIN.yRange();
+        bstroke([{x:g,y:Pplat},{x:g,y:r[1]}], cssVar('--sc-line'),2.4);
+        bstroke([{x:1-g,y:Pplat},{x:1-g,y:r[1]}], cssVar('--sc-line'),2.4);
+        bstroke([{x:g,y:Pplat},{x:1-g,y:Pplat}], cssVar('--sc-line'),2.8);
+      }
+    }
+  }
+
+  // axes
+  bctx.strokeStyle="#7a7364"; bctx.lineWidth=1;
+  bctx.beginPath(); bctx.moveTo(bmargin.left,bmargin.top); bctx.lineTo(bmargin.left,bmargin.top+bplotH); bctx.lineTo(bmargin.left+bplotW,bmargin.top+bplotH); bctx.stroke();
+
+  // caption (fixed condition)
+  bctx.font="11px -apple-system,Segoe UI,Roboto,sans-serif"; bctx.textAlign="center"; bctx.fillStyle="#5b6472";
+  bctx.fillText(decodeEnt(BIN.axis==='Tx'?BSTR.capTx[LANG]:BSTR.cappx[LANG]), bmargin.left+bplotW/2, bmargin.top-8);
+
+  // x ticks
+  bctx.font="10px -apple-system,Segoe UI,Roboto,sans-serif";
+  for(let k=0;k<=5;k++){const z=k/5; const px=bxToPx(z);
+    bctx.strokeStyle="#e7e2d5"; bctx.beginPath(); bctx.moveTo(px,bmargin.top); bctx.lineTo(px,bmargin.top+bplotH); bctx.stroke();
+    bctx.fillStyle="#5b6472"; bctx.fillText(z.toFixed(1),px,bmargin.top+bplotH+14);}
+  bctx.font="10px -apple-system,Segoe UI,Roboto,sans-serif"; bctx.fillStyle="#5b6472";
+  bctx.fillText(decodeEnt(BSTR.axisX[LANG]), bmargin.left+bplotW/2, bmargin.top+bplotH+30);
+  // pure-component labels in the top corners
+  bctx.font="700 13px -apple-system,Segoe UI,Roboto,sans-serif"; bctx.fillStyle="#1f2430";
+  bctx.textAlign="left"; bctx.fillText("A", bmargin.left+6, bmargin.top+15);
+  bctx.textAlign="right"; bctx.fillText("B", bmargin.left+bplotW-6, bmargin.top+15);
+
+  // y ticks
+  bctx.textAlign="right"; const r=BIN.yRange();
+  const yStep=BIN.axis==='Tx'?10:0.2;
+  for(let v=Math.ceil(r[0]/yStep)*yStep; v<=r[1]+1e-9; v+=yStep){
+    const py=byToPx(v);
+    bctx.strokeStyle="#e7e2d5"; bctx.beginPath(); bctx.moveTo(bmargin.left,py); bctx.lineTo(bmargin.left+bplotW,py); bctx.stroke();
+    bctx.fillStyle="#5b6472"; bctx.fillText(BIN.axis==='Tx'?v.toFixed(0):v.toFixed(1), bmargin.left-6, py+3);}
+  bctx.save(); bctx.translate(14,bmargin.top+bplotH/2); bctx.rotate(-Math.PI/2); bctx.textAlign="center";
+  bctx.fillText(decodeEnt(BIN.axis==='Tx'?BSTR.axisT[LANG]:BSTR.axisP[LANG]),0,0); bctx.restore();
+
+  // selection marker + tie line
+  if(BIN.selected){
+    const st=BIN.selected.state, z=BIN.selected.z, yv=BIN.selected.y;
+    if(st.kind==='LV'||st.kind==='LL'){
+      const aC=st.kind==='LV'?st.xL:st.a, bC=st.kind==='LV'?st.yV:st.b;
+      const py=byToPx(yv);
+      bctx.beginPath(); bctx.moveTo(bxToPx(aC),py); bctx.lineTo(bxToPx(bC),py);
+      bctx.strokeStyle="#1f2430"; bctx.lineWidth=1.6; bctx.setLineDash([4,3]); bctx.stroke(); bctx.setLineDash([]);
+      [aC,bC].forEach(c=>{bctx.beginPath(); bctx.arc(bxToPx(c),py,4.5,0,7); bctx.fillStyle="#1f2430"; bctx.fill(); bctx.lineWidth=1.4; bctx.strokeStyle="#fff"; bctx.stroke();});
+    } else if(st.kind==='LLV'){
+      const py=byToPx(yv);
+      bctx.beginPath(); bctx.moveTo(bxToPx(st.L1),py); bctx.lineTo(bxToPx(st.L2),py);
+      bctx.strokeStyle="#1f2430"; bctx.lineWidth=1.6; bctx.setLineDash([4,3]); bctx.stroke(); bctx.setLineDash([]);
+      [st.L1,st.L2].forEach(c=>{bctx.beginPath(); bctx.arc(bxToPx(c),py,4.5,0,7); bctx.fillStyle="#1f2430"; bctx.fill(); bctx.lineWidth=1.4; bctx.strokeStyle="#fff"; bctx.stroke();});
+      // vapour point highlighted in the vapour colour
+      bctx.beginPath(); bctx.arc(bxToPx(st.V),py,5,0,7); bctx.fillStyle=cssVar('--gas-line'); bctx.fill(); bctx.lineWidth=1.6; bctx.strokeStyle="#fff"; bctx.stroke();
+    }
+    const px=bxToPx(z),py=byToPx(yv);
+    bctx.beginPath(); bctx.arc(px,py,7,0,7); bctx.strokeStyle="#e63946"; bctx.lineWidth=2.5; bctx.stroke();
+    bctx.beginPath(); bctx.moveTo(px-11,py); bctx.lineTo(px+11,py); bctx.moveTo(px,py-11); bctx.lineTo(px,py+11);
+    bctx.strokeStyle="#e63946"; bctx.lineWidth=1.4; bctx.stroke();
+  }
+  bctx.restore();
+}
+function decodeEnt(s){ const d=document.createElement('textarea'); d.innerHTML=s; return d.value; }
+
+/* ---------- binary interaction ---------- */
+// A heteroazeotrope has a horizontal three-phase line (L1 + L2 + vapour).
+// Because it is a zero-height line, a tap almost never lands exactly on it, so
+// we hit-test in pixel space and snap to a dedicated three-phase state.
+function bThreePhaseHit(cx,cy){
+  if(BIN.misc!=='partial') return null;
+  const TOL=9;
+  let g, lineVal, T;
+  if(BIN.axis==='Tx'){
+    if(BIN.ucst!=='above'||BIN.T3==null) return null;   // only the hetero case has the line
+    T=BIN.T3; g=BIN.binodal(T); if(g==null) return null;
+    lineVal=T-273.15;
+  } else {
+    T=BIN.Tref; g=BIN.binodal(T); if(g==null) return null; // plateau only when immiscible at Tref
+    lineVal=BIN.Pmix(g,T);
+  }
+  const lineY=byToPx(lineVal), x1=bxToPx(g), x2=bxToPx(1-g);
+  if(cy>=lineY-TOL&&cy<=lineY+TOL&&cx>=Math.min(x1,x2)-2&&cx<=Math.max(x1,x2)+2){
+    return {kind:'LLV', L1:g, L2:1-g, V:BIN.yVap(g,T), y:lineVal};
+  }
+  return null;
+}
+function bHandleTap(evt){
+  evt.preventDefault();
+  const rect=bcanvas.getBoundingClientRect();
+  const cx=(evt.touches?evt.touches[0].clientX:evt.clientX)-rect.left;
+  const cy=(evt.touches?evt.touches[0].clientY:evt.clientY)-rect.top;
+  if(cx<bmargin.left||cx>bmargin.left+bplotW||cy<bmargin.top||cy>bmargin.top+bplotH) return;
+  let z=bpxToX(cx); z=Math.max(0,Math.min(1,z));
+  const hit=bThreePhaseHit(cx,cy);
+  if(hit){
+    BIN.selected={z:z,y:hit.y,state:hit};
+  } else {
+    const yv=bpxToY(cy);
+    BIN.selected={z:z,y:yv,state:BIN.stateAt(z,yv)};
+  }
+  document.getElementById('bhint').style.display='none';
+  bUpdateReadout(); bdraw();
+}
+bcanvas.addEventListener('pointerdown',bHandleTap);
+bcanvas.addEventListener('pointermove',evt=>{ if(evt.pressure>0||evt.buttons===1) bHandleTap(evt); });
+
+/* ---------- binary readout ---------- */
+function pct(x){ return (x*100).toFixed(1)+' %'; }
+function bBadgeLabel(st,yv){
+  let name;
+  if(st.kind==='L') name=BSTR.phaseLiquid[LANG];
+  else if(st.kind==='V') name=BSTR.phaseVapor[LANG];
+  else if(st.kind==='LV') name=BSTR.phaseLV[LANG];
+  else if(st.kind==='LLV') name=BSTR.phaseLLV[LANG];
+  else name=BSTR.phaseLL[LANG];
+  const cond = BIN.axis==='Tx' ? (yv.toFixed(1)+' °C') : (yv.toFixed(2)+' bar');
+  return name+'<span class="sub">x<sub>B</sub> = '+BIN.selected.z.toFixed(3)+' , '+cond+'</span>';
+}
+function bTwoPhaseTable(c1,c2,comp1,comp2,amt1,amt2){
+  return '<table class="compare"><tr><th>&nbsp;</th><th>'+c1+'</th><th>'+c2+'</th></tr>'+
+    '<tr><td>'+BSTR.rowComp[LANG]+'</td><td>'+comp1.toFixed(3)+'</td><td>'+comp2.toFixed(3)+'</td></tr>'+
+    '<tr><td>'+BSTR.rowAmount[LANG]+'</td><td>'+pct(amt1)+'</td><td>'+pct(amt2)+'</td></tr>'+
+    '</table>';
+}
+function bUpdateReadout(){
+  if(!BIN.selected) return;
+  const st=BIN.selected.state, yv=BIN.selected.y;
+  const badge=document.getElementById('bPhaseBadge');
+  const note=document.getElementById('bCoexNote');
+  const wrap=document.getElementById('bPropsWrap');
+  badge.innerHTML=bBadgeLabel(st,yv);
+  // badge colour
+  badge.style.background = st.kind==='LV'?'#efe4d0' : st.kind==='LL'?cssVar('--sc') : st.kind==='LLV'?'#f2d9b0' : cssVar(BKIND_COLOR[st.kind]);
+  if(st.kind==='LLV'){
+    wrap.innerHTML='<table class="compare"><tr><th>&nbsp;</th><th>'+BSTR.colL1[LANG]+'</th><th>'+BSTR.colL2[LANG]+'</th><th>'+BSTR.colVapor[LANG]+'</th></tr>'+
+      '<tr><td>'+BSTR.rowComp[LANG]+'</td><td>'+st.L1.toFixed(3)+'</td><td>'+st.L2.toFixed(3)+'</td><td>'+st.V.toFixed(3)+'</td></tr>'+
+      '</table><div style="font-size:.72rem;color:var(--sub);margin-top:6px;">'+BSTR.threeAmt[LANG]+'</div>';
+    note.style.display='block'; note.innerHTML=BSTR.noteHetero[LANG];
+  } else if(st.kind==='LV'){
+    const liqLeftofVap = st.xL>st.yV; // show liquid col first regardless
+    wrap.innerHTML=bTwoPhaseTable(BSTR.colLiquid[LANG],BSTR.colVapor[LANG],st.xL,st.yV,st.fLiq,st.fVap);
+    note.style.display='block'; note.innerHTML=BSTR.noteLV[LANG];
+  } else if(st.kind==='LL'){
+    wrap.innerHTML=bTwoPhaseTable(BSTR.colL1[LANG],BSTR.colL2[LANG],st.a,st.b,st.fa,st.fb);
+    note.style.display='block';
+    note.innerHTML=(BIN.misc==='partial'&&BIN.ucst==='above'&&BIN.axis==='Tx'&&BIN.T3&&Math.abs((yv+273.15)-BIN.T3)<0.6)?BSTR.noteHetero[LANG]:BSTR.noteLL[LANG];
+  } else {
+    const nm = st.kind==='L'?BSTR.colLiquid[LANG]:BSTR.colVapor[LANG];
+    wrap.innerHTML='<table class="compare"><tr><th>&nbsp;</th><th>'+nm+'</th></tr>'+
+      '<tr><td>'+BSTR.overall[LANG]+' xʙ</td><td>'+BIN.selected.z.toFixed(3)+'</td></tr></table>';
+    note.style.display='none';
+  }
+  initBinParticles(st);
+}
+
+/* ---------- binary particle animation ---------- */
+const bmolCanvas=document.getElementById('bmol'), bmolCtx=bmolCanvas.getContext('2d');
+const COMP_COLOR={A:'#b5532f',B:'#2f6f8f'};
+let bparticles=[], bbandLines=[];
+function initBinParticles(st){
+  bparticles=[]; bbandLines=[];
+  const W_=bmolCanvas.width,H_=bmolCanvas.height;
+  let bands=[];
+  if(st.kind==='L') bands=[{t:'liq',xB:st.z,w:1}];
+  else if(st.kind==='V') bands=[{t:'vap',xB:st.z,w:1}];
+  else if(st.kind==='LV') bands=[{t:'liq',xB:st.xL,w:Math.max(st.fLiq,0.001)},{t:'vap',xB:st.yV,w:Math.max(st.fVap,0.001)}];
+  else if(st.kind==='LLV') bands=[{t:'liq',xB:st.L1,w:1},{t:'liq',xB:st.L2,w:1},{t:'vap',xB:st.V,w:1}];
+  else bands=[{t:'liq',xB:st.a,w:Math.max(st.fa,0.001)},{t:'liq',xB:st.b,w:Math.max(st.fb,0.001)}];
+  const tot=bands.reduce((s,b)=>s+b.w,0);
+  let x0=0;
+  bands.forEach((bd,bi)=>{
+    const frac=Math.max(0.16,bd.w/tot);
+    const x1=bi===bands.length-1?W_:Math.min(W_,x0+frac*W_);
+    if(bi>0) bbandLines.push(x0);
+    const area=(x1-x0)*H_;
+    const N=bd.t==='vap'?Math.max(5,Math.round(area/900)):Math.round(area/420);
+    for(let i=0;i<N;i++){
+      const isB=Math.random()<bd.xB;
+      const sp=bd.t==='vap'?3.0:1.0;
+      bparticles.push({c:isB?'B':'A',x:x0+2+Math.random()*(x1-x0-4),y:2+Math.random()*(H_-4),
+        vx:(Math.random()-0.5)*sp,vy:(Math.random()-0.5)*sp,xmin:x0+2,xmax:x1-2});
+    }
+    x0=x1;
+  });
+}
+function banimate(){
+  const W_=bmolCanvas.width,H_=bmolCanvas.height;
+  bmolCtx.clearRect(0,0,W_,H_);
+  bmolCtx.strokeStyle="#5b6472"; bmolCtx.setLineDash([]); bmolCtx.lineWidth=2.5;
+  bbandLines.forEach(x=>{bmolCtx.beginPath();bmolCtx.moveTo(x,0);bmolCtx.lineTo(x,H_);bmolCtx.stroke();});
+  bparticles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<p.xmin||p.x>p.xmax)p.vx*=-1;
+    if(p.y<3||p.y>H_-3)p.vy*=-1;
+    p.x=Math.max(p.xmin,Math.min(p.xmax,p.x)); p.y=Math.max(3,Math.min(H_-3,p.y));
+    bmolCtx.fillStyle=COMP_COLOR[p.c];
+    bmolCtx.beginPath(); bmolCtx.arc(p.x,p.y,3.6,0,7); bmolCtx.fill();
+  });
+  requestAnimationFrame(banimate);
+}
+initBinParticles({kind:'V',z:0.4}); banimate();
+
+/* ---------- binary controls ---------- */
+function bSyncControls(){
+  document.getElementById('grpUCST').style.display = BIN.misc==='partial'?'':'none';
+  document.getElementById('grpAzeo').style.display = (BIN.dev==='azeo'&&BIN.misc!=='partial')?'':'none';
+  document.getElementById('grpDev').classList.toggle('disabled', BIN.misc==='partial');
+  const setActive=(id,attr,val)=>document.querySelectorAll('#'+id+' button').forEach(b=>b.classList.toggle('active',b.dataset[attr]===val));
+  setActive('segAxis','ax',BIN.axis); setActive('segMisc','m',BIN.misc);
+  setActive('segUCST','u',BIN.ucst); setActive('segDev','d',BIN.dev); setActive('segAzeo','z',BIN.azeo);
+}
+function bResetReadout(){
+  BIN.selected=null;
+  document.getElementById('bhint').style.display='block';
+  const badge=document.getElementById('bPhaseBadge');
+  badge.innerHTML=BSTR.tapPrompt[LANG]+'<span class="sub">'+BSTR.tapSub[LANG]+'</span>';
+  badge.style.background='#f1efe6';
+  document.getElementById('bCoexNote').style.display='none';
+  document.getElementById('bPropsWrap').innerHTML='';
+  initBinParticles({kind:'V',z:0.4});
+}
+function bRenderFacts(){
+  document.getElementById('bFacts').innerHTML='<h3>'+STR.worthKnowing[LANG]+'</h3><ul>'+
+    '<li>'+BFACTS.base[LANG]+'</li><li>'+BFACTS[binFactKey()][LANG]+'</li></ul>';
+}
+function bOnConfigChange(){ BIN.refresh(); bSyncControls(); bResetReadout(); bRenderFacts(); bdraw(); }
+function bBindSeg(id,attr,prop){
+  document.getElementById(id).addEventListener('click',e=>{
+    const btn=e.target.closest('button'); if(!btn) return;
+    BIN[prop]=btn.dataset[attr]; bOnConfigChange();
+  });
+}
+BIN.initControls=function(){
+  bBindSeg('segAxis','ax','axis'); bBindSeg('segMisc','m','misc');
+  bBindSeg('segUCST','u','ucst'); bBindSeg('segDev','d','dev'); bBindSeg('segAzeo','z','azeo');
+};
+
+/* ---------- binary language ---------- */
+function applyLanguageBinary(){
+  const T=(id,key)=>{const el=document.getElementById(id); if(el) el.innerHTML=BSTR[key][LANG];};
+  document.querySelector('#modeToggle [data-mode="single"]').textContent=BSTR.modeSingle[LANG];
+  document.querySelector('#modeToggle [data-mode="binary"]').textContent=BSTR.modeBinary[LANG];
+  T('lblAxis','lblAxis'); T('lblMisc','lblMisc'); T('lblUCST','lblUCST'); T('lblDev','lblDev'); T('lblAzeo','lblAzeo');
+  const setBtn=(sel,html)=>{const el=document.querySelector(sel); if(el) el.innerHTML=html;};
+  setBtn('#segAxis [data-ax="Tx"]',BSTR.axTx[LANG]); setBtn('#segAxis [data-ax="px"]',BSTR.axpx[LANG]);
+  setBtn('#segMisc [data-m="mix"]',BSTR.mMix[LANG]); setBtn('#segMisc [data-m="partial"]',BSTR.mPartial[LANG]);
+  setBtn('#segUCST [data-u="below"]',BSTR.uBelow[LANG]); setBtn('#segUCST [data-u="above"]',BSTR.uAbove[LANG]);
+  setBtn('#segDev [data-d="ideal"]',BSTR.dIdeal[LANG]); setBtn('#segDev [data-d="slight"]',BSTR.dSlight[LANG]); setBtn('#segDev [data-d="azeo"]',BSTR.dAzeo[LANG]);
+  setBtn('#segAzeo [data-z="min"]',BSTR.zMin[LANG]); setBtn('#segAzeo [data-z="max"]',BSTR.zMax[LANG]);
+  T('blegLiquid','legLiquid'); T('blegVapor','legVapor'); T('blegTwo','legTwo'); T('blegLL','legLL');
+  document.getElementById('bhint').innerHTML=BSTR.hint[LANG];
+  bRenderFacts();
+  if(BIN.selected) bUpdateReadout(); else bResetReadout();
+  if(document.getElementById('viewBinary').style.display!=='none') bdraw();
+}
+
+/* ---------- mode switching ---------- */
+document.getElementById('modeToggle').addEventListener('click',e=>{
+  const btn=e.target.closest('.mode-btn'); if(!btn) return;
+  const mode=btn.dataset.mode;
+  document.querySelectorAll('.mode-btn').forEach(x=>x.classList.toggle('active',x===btn));
+  document.getElementById('viewSingle').style.display = mode==='single'?'':'none';
+  document.getElementById('viewBinary').style.display = mode==='binary'?'':'none';
+  if(mode==='binary'){
+    if(!BIN.started){ BIN.started=true; BIN.initControls(); BIN.refresh(); bSyncControls(); bRenderFacts(); applyLanguageBinary(); }
+    BIN.refresh(); bresize();
+  } else { resizeCanvas(); }
+});
+
 applyLanguage();
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', ()=>{ resizeCanvas(); if(document.getElementById('viewBinary').style.display!=='none') bresize(); });
 resizeCanvas();
 })();
 </script>
