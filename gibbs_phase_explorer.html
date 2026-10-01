@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Phase Diagram Explorer</title>
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#f7f5f0;
+    --card:#ffffff;
+    --ink:#1f2430;
+    --sub:#5b6472;
+    --line:#dcd6c8;
+    --accent:#8b3a3a;
+    --accent2:#2f5d62;
+    --solid:#cfe0f5;
+    --solid-line:#5b84b1;
+    --liquid:#cdeaf0;
+    --liquid-line:#2f8a99;
+    --gas:#fdf1cf;
+    --gas-line:#c9922c;
+    --sc:#e6d9f2;
+    --sc-line:#8657ab;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .app{max-width:1100px;margin:0 auto;padding:10px 10px 24px;}
+  header{text-align:center;padding:10px 6px 4px;}
+  header h1{font-size:1.35rem;margin:0 0 2px;letter-spacing:.2px;}
+  header p{margin:0;color:var(--sub);font-size:.85rem;}
+  .lang-toggle{display:flex;justify-content:center;gap:6px;margin-top:10px;}
+  .lang-btn{
+    font-size:.72rem;padding:4px 12px;border-radius:999px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);cursor:pointer;font-weight:700;letter-spacing:.3px;
+  }
+  .lang-btn.active{background:var(--accent2);border-color:var(--accent2);color:#fff;}
+  .tabs{display:flex;justify-content:center;gap:8px;margin:14px 0 10px;}
+  .tab{
+    border:1px solid var(--line);background:var(--card);color:var(--ink);
+    padding:9px 18px;border-radius:999px;font-size:.95rem;font-weight:600;
+    cursor:pointer;transition:all .15s ease;
+  }
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .layout{display:flex;flex-direction:column;gap:14px;}
+  @media(min-width:820px){ .layout{flex-direction:row;align-items:flex-start;} .diagram-col{flex:1.5;} .panel-col{flex:1;min-width:300px;} }
+  .diagram-col, .panel-col{width:100%;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;}
+  .diagram-card{position:relative;}
+  #hint{
+    position:absolute;top:14px;left:0;right:0;text-align:center;
+    color:var(--sub);font-size:.82rem;pointer-events:none;
+  }
+  canvas#plot{width:100%;height:auto;display:block;touch-action:none;border-radius:8px;cursor:crosshair;}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:.72rem;color:var(--sub);justify-content:center;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .swatch{width:11px;height:11px;border-radius:3px;display:inline-block;}
+  .phase-badge{
+    font-size:1.15rem;font-weight:700;text-align:center;padding:12px 10px;border-radius:10px;
+    background:#f1efe6;margin-bottom:10px;transition:background .2s ease,color .2s ease;
+  }
+  .phase-badge .sub{display:block;font-size:.78rem;font-weight:500;color:var(--sub);margin-top:2px;}
+  #molWrap{display:flex;justify-content:center;margin-bottom:10px;}
+  canvas#mol{background:#fafaf5;border:1px solid var(--line);border-radius:8px;}
+  table.props{width:100%;border-collapse:collapse;font-size:.86rem;}
+  table.props td{padding:6px 4px;border-bottom:1px solid var(--line);}
+  table.props td.k{color:var(--sub);}
+  table.props td.v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+  .gformula{margin-top:10px;padding:8px 10px;background:#f1efe6;border-radius:8px;font-size:.78rem;color:var(--sub);text-align:center;}
+  .facts{margin-top:12px;}
+  .facts h3{font-size:.85rem;margin:0 0 6px;color:var(--accent2);}
+  .facts ul{margin:0;padding-left:18px;font-size:.8rem;color:var(--sub);line-height:1.5;}
+  footer{margin-top:16px;font-size:.72rem;color:var(--sub);text-align:center;line-height:1.5;}
+  .pt-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px;}
+  .pt-btn{
+    font-size:.72rem;padding:5px 10px;border-radius:999px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);cursor:pointer;
+  }
+  .pt-btn:active{background:var(--accent);color:#fff;}
+  .coex-note{
+    background:#fbeee0;border:1px solid #e0c9a6;border-radius:8px;padding:8px 10px;
+    font-size:.78rem;color:#6b4a24;line-height:1.4;margin-bottom:10px;
+  }
+  table.compare{width:100%;border-collapse:collapse;font-size:.82rem;}
+  table.compare th{font-size:.72rem;color:var(--sub);text-align:right;padding:4px;border-bottom:2px solid var(--line);}
+  table.compare th:first-child{text-align:left;}
+  table.compare td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+  table.compare td:first-child{text-align:left;color:var(--sub);font-weight:500;}
+  table.compare td.match{color:var(--accent2);}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1 id="titleText">Phase Diagram Explorer</h1>
+    <p id="subtitleText">Tap anywhere on the diagram to read the state of matter and its thermodynamic properties.</p>
+    <div class="lang-toggle" id="langToggle">
+      <button class="lang-btn" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="ca">CA</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-sub="water">Water (H&#8322;O)</button>
+    <button class="tab" data-sub="co2">Carbon Dioxide (CO&#8322;)</button>
+    <button class="tab" data-sub="isobutane">Isobutane (C&#8324;H&#8321;&#8320;)</button>
+  </div>
+
+  <div class="layout">
+    <div class="diagram-col">
+      <div class="card diagram-card">
+        <div id="hint">tap / click the diagram to explore &#8594;</div>
+        <canvas id="plot"></canvas>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--solid)"></i><span id="legSolid">Solid</span></span>
+          <span><i class="swatch" style="background:var(--liquid)"></i><span id="legLiquid">Liquid</span></span>
+          <span><i class="swatch" style="background:var(--gas)"></i><span id="legGas">Gas</span></span>
+          <span><i class="swatch" style="background:var(--sc)"></i><span id="legSc">Supercritical fluid</span></span>
+        </div>
+        <div class="pt-list" id="ptList"></div>
+      </div>
+    </div>
+
+    <div class="panel-col">
+      <div class="card">
+        <div class="phase-badge" id="phaseBadge">Tap the diagram<span class="sub">to select a state</span></div>
+        <div id="molWrap"><canvas id="mol" width="160" height="100"></canvas></div>
+        <div id="coexNote" class="coex-note" style="display:none;"></div>
+        <div id="propsWrap">
+        <table class="props" id="propsTable">
+          <tr><td class="k">Temperature</td><td class="v" id="pT">&#8212;</td></tr>
+          <tr><td class="k">Pressure</td><td class="v" id="pP">&#8212;</td></tr>
+          <tr><td class="k">Density</td><td class="v" id="pRho">&#8212;</td></tr>
+          <tr><td class="k">Enthalpy (h)</td><td class="v" id="pH">&#8212;</td></tr>
+          <tr><td class="k">Entropy (s)</td><td class="v" id="pS">&#8212;</td></tr>
+          <tr><td class="k">Gibbs free energy (g)</td><td class="v" id="pG">&#8212;</td></tr>
+        </table>
+        </div>
+        <div class="gformula" id="gformulaText">g = h &#8722; T&middot;s &nbsp;&mdash;&nbsp; this is the quantity Gibbs showed determines whether a change happens spontaneously.</div>
+        <div class="facts" id="facts"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer id="footerNote"></footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const R = 8.314;
+
+/* ---------- math helpers ---------- */
+function fitQuad3(pts){
+  const [p1,p2,p3]=pts;
+  const A=[[1,p1.x,p1.x*p1.x],[1,p2.x,p2.x*p2.x],[1,p3.x,p3.x*p3.x]];
+  const Y=[p1.y,p2.y,p3.y];
+  function det3(m){return m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);}
+  const D=det3(A);
+  function replaceCol(m,col,vals){const r=m.map(row=>row.slice()); for(let i=0;i<3;i++) r[i][col]=vals[i]; return r;}
+  const Da=det3(replaceCol(A,0,Y)), Db=det3(replaceCol(A,1,Y)), Dc=det3(replaceCol(A,2,Y));
+  return {a:Da/D,b:Db/D,c:Dc/D};
+}
+function fit2pt(T1,P1,T2,P2){
+  const b=(Math.log(P1)-Math.log(P2))/(1/T2-1/T1);
+  const a=Math.log(P1)+b/T1;
+  return {a,b};
+}
+
+/* ---------- i18n ---------- */
+let LANG = 'ca';
+const STR = {
+  title:{en:"Phase Diagram Explorer", ca:"Explorador de Diagrames de Fase"},
+  subtitle:{en:"Tap anywhere on the diagram to read the state of matter and its thermodynamic properties.",
+             ca:"Toca qualsevol punt del diagrama per llegir l'estat de la matèria i les seves propietats termodinàmiques."},
+  hint:{en:"tap / click the diagram to explore &#8594;", ca:"toca / clica el diagrama per explorar &#8594;"},
+  solid:{en:"Solid", ca:"Sòlid"},
+  liquid:{en:"Liquid", ca:"Líquid"},
+  gas:{en:"Gas", ca:"Gas"},
+  supercritical:{en:"Supercritical fluid", ca:"Fluid supercrític"},
+  gformula:{en:"g = h &#8722; T&middot;s &nbsp;&mdash;&nbsp; this is the quantity Gibbs showed determines whether a change happens spontaneously.",
+             ca:"g = h &#8722; T&middot;s &nbsp;&mdash;&nbsp; aquesta és la magnitud que Gibbs va demostrar que determina si un canvi passa espontàniament."},
+  worthKnowing:{en:"Worth knowing", ca:"Val la pena saber"},
+  tapPrompt:{en:"Tap the diagram", ca:"Toca el diagrama"},
+  tapSub:{en:"to select a state", ca:"per seleccionar un estat"},
+  at:{en:" at ", ca:" a "},
+  footer:{en:"Property values (density, enthalpy, entropy, Gibbs free energy) are educational approximations built from real reference points (triple point, critical point, boiling point) and the Clausius&ndash;Clapeyron relation &mdash; not a full IAPWS/NIST equation of state. Trends, phase boundaries and orders of magnitude are physically accurate; treat exact decimal values as illustrative.",
+          ca:"Els valors de les propietats (densitat, entalpia, entropia, energia lliure de Gibbs) són aproximacions educatives construïdes a partir de punts de referència reals (punt triple, punt crític, punt d'ebullició) i la relació de Clausius&ndash;Clapeyron &mdash; no és una equació d'estat completa IAPWS/NIST. Les tendències, els límits de fase i els ordres de magnitud són físicament precisos; considera els valors decimals exactes com a il·lustratius."}
+};
+const TAB_LABEL = {
+  water:{en:"Water (H&#8322;O)", ca:"Aigua (H&#8322;O)"},
+  co2:{en:"Carbon Dioxide (CO&#8322;)", ca:"Di&ograve;xid de carboni (CO&#8322;)"},
+  isobutane:{en:"Isobutane (C&#8324;H&#8321;&#8320;)", ca:"Isobut&agrave; (C&#8324;H&#8321;&#8320;)"}
+};
+const TBL = {
+  property:{en:"Property", ca:"Propietat"},
+  temperature:{en:"Temperature", ca:"Temperatura"},
+  pressure:{en:"Pressure", ca:"Pressi&oacute;"},
+  density:{en:"Density", ca:"Densitat"},
+  enthalpy:{en:"Enthalpy (h)", ca:"Entalpia (h)"},
+  entropy:{en:"Entropy (s)", ca:"Entropia (s)"},
+  gibbs:{en:"Gibbs free energy (g)", ca:"Energia lliure de Gibbs (g)"}
+};
+const AXIS_LABEL = {
+  t:{en:"Temperature (°C)", ca:"Temperatura (°C)"},
+  p:{en:"Pressure (bar, log scale)", ca:"Pressió (bar, escala logarítmica)"}
+};
+const SPECIAL_LABEL = {
+  triple:{en:"Triple point", ca:"Punt triple"},
+  critical:{en:"Critical point", ca:"Punt crític"},
+  boiling:{en:"Boiling (1 atm)", ca:"Ebullició (1 atm)"},
+  freezing:{en:"Freezing (1 atm)", ca:"Congelació (1 atm)"},
+  sublimes:{en:"Dry ice sublimes (1 atm)", ca:"El gel sec sublima (1 atm)"}
+};
+
+/* ---------- WATER model ---------- */
+const W = { key:"water", label:{en:"Water", ca:"Aigua"}, formula:"H₂O",
+  Tt:273.16, Pt:611.657, Tc:647.10, Pc:22.064e6, Tb:373.15, Pb:101325,
+  M:0.018015, Cp_s:2090, Cp_l:4186, Lfus:334000, Lref:2257000,
+  fusCapT:253.15,
+  axis:{Tmin:-25,Tmax:400,Pmin:1e-3,Pmax:1e4},
+  special:[
+    {key:"triple",T:0.01,P:0.00612},
+    {key:"critical",T:373.95,P:220.64},
+    {key:"boiling",T:100,P:1.01325},
+    {key:"freezing",T:0,P:1.01325}
+  ]
+};
+W.vapFit = fitQuad3([{x:1/W.Tt,y:Math.log(W.Pt)},{x:1/W.Tb,y:Math.log(W.Pb)},{x:1/W.Tc,y:Math.log(W.Pc)}]);
+W.Pvap = T => Math.exp(W.vapFit.a + W.vapFit.b/T + W.vapFit.c/(T*T));
+W.subFit = fit2pt(W.Tt,W.Pt,233.15,12.8);
+W.Psub = T => Math.exp(W.subFit.a - W.subFit.b/T);
+// Fusion slope anchored to two REAL points: the triple point (0.01°C, 0.00612 bar)
+// and the well-known freezing point of water at 1 atm (0°C, 1.01325 bar).
+// This guarantees the drawn curve (and coexistence detection) passes exactly
+// through both, instead of relying on a theoretical Clausius-Clapeyron estimate.
+W.fusSlope = (W.Pt - 101325) / (W.Tt - 273.15);
+W.Pfus = T => W.Pt + W.fusSlope*(Math.max(T,W.fusCapT)-W.Tt);
+W.Lvap = T => W.Lref*Math.pow(Math.max((W.Tc-T)/(W.Tc-W.Tb),0.0001),0.38);
+W.Lsub = W.Lfus + W.Lvap(W.Tt);
+W.rho_solid = 917;
+W.rho_liquid = TcC => TcC>=4 ? 1000-0.0357*Math.pow(TcC-4,1.5) : 1000-0.0090*Math.pow(4-TcC,2);
+W.rho_gas = (T,P) => P*W.M/(R*T);
+W.v_solid = 1/W.rho_solid;
+W.v_liquid = 1/W.rho_liquid(W.Tt-273.15);
+W.h_solid_T = T => -W.Lfus + W.Cp_s*(T-W.Tt);
+W.h_solid = (T,P) => W.h_solid_T(T) + W.v_solid*(P-W.Pt);
+W.s_solid = T => -W.Lfus/W.Tt + W.Cp_s*Math.log(T/W.Tt);
+W.h_liquid_T = T => W.Cp_l*(T-W.Tt);
+W.h_liquid = (T,P) => W.h_liquid_T(T) + W.v_liquid*(P-W.Pt);
+W.s_liquid = T => W.Cp_l*Math.log(T/W.Tt);
+W.h_vapor = T => W.h_liquid(T, W.Pvap(T)) + W.Lvap(T);
+W.s_vapor = (T,P) => W.s_liquid(T) + W.Lvap(T)/T - (R/W.M)*Math.log(P/W.Pvap(T));
+W.h_vapor_sub = T => W.h_solid(T, W.Psub(T)) + W.Lsub;
+W.s_vapor_sub = (T,P) => W.s_solid(T) + W.Lsub/T - (R/W.M)*Math.log(P/W.Psub(T));
+W.phase = function(T_K,P_Pa){
+  const EPS=1-1e-6;
+  if (T_K>=this.Tc) return P_Pa>=this.Pc*EPS ? "supercritical" : "gas";
+  if (T_K < this.Tt){
+    if (T_K>=this.fusCapT && P_Pa > this.Pfus(T_K)*EPS) return "liquid";
+    if (P_Pa >= this.Psub(T_K)*EPS) return "solid";
+    return "gas";
+  }
+  return P_Pa < this.Pvap(T_K)*EPS ? "gas" : "liquid";
+};
+W.calc = function(phaseName,T_K,P_Pa){
+  let h,s,rho;
+  if (phaseName==="solid"){ h=this.h_solid(T_K,P_Pa); s=this.s_solid(T_K); rho=this.rho_solid; }
+  else if (phaseName==="liquid"){ h=this.h_liquid(T_K,P_Pa); s=this.s_liquid(T_K); rho=this.rho_liquid(T_K-273.15); }
+  else {
+    if (T_K < this.Tt){ h=this.h_vapor_sub(T_K); s=this.s_vapor_sub(T_K,P_Pa); }
+    else { h=this.h_vapor(T_K); s=this.s_vapor(T_K,P_Pa); }
+    rho=this.rho_gas(T_K,P_Pa);
+  }
+  return {phase:phaseName,h,s,g:h-T_K*s,rho};
+};
+W.props = function(T_K,P_Pa){ return this.calc(this.phase(T_K,P_Pa),T_K,P_Pa); };
+W.facts = {
+  en:[
+    "Ice floats because it is <b>less dense</b> than liquid water &mdash; the fusion line here leans the opposite way from almost every other substance.",
+    "The critical point (374&deg;C, 221 bar) is where the liquid/gas distinction disappears entirely.",
+    "The triple point (0.01&deg;C, 0.006 bar) is the one exact condition where ice, water and steam coexist."
+  ],
+  ca:[
+    "El gel flota perquè és <b>menys dens</b> que l'aigua líquida &mdash; la línia de fusió aquí s'inclina en sentit contrari al de gairebé totes les altres substàncies.",
+    "El punt crític (374&deg;C, 221 bar) és on la distinció entre líquid i gas desapareix completament.",
+    "El punt triple (0,01&deg;C, 0,006 bar) és l'única condició exacta on coexisteixen el gel, l'aigua i el vapor."
+  ]
+};
+W.boundaries = [
+  {fn:W.Pvap, tmin:0.01, tmax:373.95, color:'--liquid-line', type:'vaporization', phases:['liquid','gas']},
+  {fn:W.Psub, tmin:W.axis.Tmin, tmax:0.01, color:'--gas-line', type:'sublimation', phases:['solid','gas']},
+  {fn:W.Pfus, tmin:W.fusCapT-273.15, tmax:0.01, color:'--solid-line', type:'fusion', phases:['solid','liquid']}
+];
+
+/* ---------- CO2 model ---------- */
+const C = { key:"co2", label:{en:"Carbon Dioxide", ca:"Diòxid de carboni"}, formula:"CO₂",
+  Tt:216.55, Pt:518500, Tc:304.25, Pc:7.38e6,
+  M:0.04401, Cp_s:850, Cp_l:2000, Lfus:184000, Lsub_direct:571000,
+  fusSlope:4.087e6,
+  axis:{Tmin:-95,Tmax:50,Pmin:1e-2,Pmax:1e4},
+  special:[
+    {key:"triple",T:-56.6,P:5.185},
+    {key:"critical",T:31.1,P:73.8},
+    {key:"sublimes",T:-78.5,P:1.01325}
+  ]
+};
+C.subFit = fit2pt(C.Tt,C.Pt,194.65,101325);
+C.Psub = T => Math.exp(C.subFit.a - C.subFit.b/T);
+C.vapFit = fit2pt(C.Tt,C.Pt,C.Tc,C.Pc);
+C.Pvap = T => Math.exp(C.vapFit.a - C.vapFit.b/T);
+C.Pfus = T => C.Pt + C.fusSlope*(T-C.Tt);
+C.Lvap0 = C.Lsub_direct - C.Lfus;
+C.Lvap = T => C.Lvap0*Math.pow(Math.max((C.Tc-T)/(C.Tc-C.Tt),0.0001),0.38);
+C.rho_solid = 1560;
+C.rho_liquid = T => 1178 + (464-1178)*(T-C.Tt)/(C.Tc-C.Tt);
+C.rho_gas = (T,P) => P*C.M/(R*T);
+C.v_solid = 1/C.rho_solid;
+C.v_liquid = 1/C.rho_liquid(C.Tt);
+C.h_solid_T = T => -C.Lfus + C.Cp_s*(T-C.Tt);
+C.h_solid = (T,P) => C.h_solid_T(T) + C.v_solid*(P-C.Pt);
+C.s_solid = T => -C.Lfus/C.Tt + C.Cp_s*Math.log(T/C.Tt);
+C.h_liquid_T = T => C.Cp_l*(T-C.Tt);
+C.h_liquid = (T,P) => C.h_liquid_T(T) + C.v_liquid*(P-C.Pt);
+C.s_liquid = T => C.Cp_l*Math.log(T/C.Tt);
+C.h_vapor = T => C.h_liquid(T, C.Pvap(T)) + C.Lvap(T);
+C.s_vapor = (T,P) => C.s_liquid(T) + C.Lvap(T)/T - (R/C.M)*Math.log(P/C.Pvap(T));
+C.h_vapor_sub = T => C.h_solid(T, C.Psub(T)) + C.Lsub_direct;
+C.s_vapor_sub = (T,P) => C.s_solid(T) + C.Lsub_direct/T - (R/C.M)*Math.log(P/C.Psub(T));
+C.phase = function(T_K,P_Pa){
+  const EPS=1-1e-6;
+  if (T_K>=this.Tc) return P_Pa>=this.Pc*EPS ? "supercritical" : "gas";
+  if (T_K < this.Tt) return P_Pa >= this.Psub(T_K)*EPS ? "solid" : "gas";
+  const psat=this.Pvap(T_K), pfus=this.Pfus(T_K);
+  if (P_Pa < psat*EPS) return "gas";
+  if (P_Pa < pfus*EPS) return "liquid";
+  return "solid";
+};
+C.calc = function(phaseName,T_K,P_Pa){
+  let h,s,rho;
+  if (phaseName==="solid"){ h=this.h_solid(T_K,P_Pa); s=this.s_solid(T_K); rho=this.rho_solid; }
+  else if (phaseName==="liquid"){ h=this.h_liquid(T_K,P_Pa); s=this.s_liquid(T_K); rho=this.rho_liquid(T_K); }
+  else {
+    if (T_K < this.Tt){ h=this.h_vapor_sub(T_K); s=this.s_vapor_sub(T_K,P_Pa); }
+    else { h=this.h_vapor(T_K); s=this.s_vapor(T_K,P_Pa); }
+    rho=this.rho_gas(T_K,P_Pa);
+  }
+  return {phase:phaseName,h,s,g:h-T_K*s,rho};
+};
+C.props = function(T_K,P_Pa){ return this.calc(this.phase(T_K,P_Pa),T_K,P_Pa); };
+C.facts = {
+  en:[
+    "At normal atmospheric pressure (1 atm) CO&#8322; has <b>no liquid phase at all</b> &mdash; solid \"dry ice\" sublimes straight to gas, which is why it never puddles.",
+    "You need at least 5.1 atm of pressure (the triple point) before liquid CO&#8322; can exist, which is why liquid CO&#8322; fire extinguishers are pressurized canisters.",
+    "The critical point sits close to room temperature (31.1&deg;C), which is why supercritical CO&#8322; is used industrially (e.g. decaffeinating coffee)."
+  ],
+  ca:[
+    "A pressió atmosfèrica normal (1 atm) el CO&#8322; <b>no té cap fase líquida</b> &mdash; el \"gel sec\" sòlid sublima directament a gas, per això mai no forma bassals.",
+    "Cal com a mínim 5,1 atm de pressió (el punt triple) perquè pugui existir CO&#8322; líquid, per això els extintors de CO&#8322; líquid són pots pressuritzats.",
+    "El punt crític és proper a la temperatura ambient (31,1&deg;C), per això el CO&#8322; supercrític s'utilitza industrialment (p. ex. per descafeïnar el cafè)."
+  ]
+};
+C.boundaries = [
+  {fn:C.Pvap, tmin:-56.6, tmax:31.1, color:'--liquid-line', type:'vaporization', phases:['liquid','gas']},
+  {fn:C.Psub, tmin:C.axis.Tmin, tmax:-56.6, color:'--gas-line', type:'sublimation', phases:['solid','gas']},
+  {fn:C.Pfus, tmin:-56.6, tmax:5, color:'--solid-line', type:'fusion', phases:['solid','liquid']}
+];
+
+/* ---------- ISOBUTANE model ---------- */
+// Reference data: NIST Chemistry WebBook (Ttriple, Ptriple, Tc, Pc, boiling-point
+// enthalpy/entropy of vaporization, enthalpy/entropy of fusion, liquid Cp) and the
+// Wikipedia isobutane data page (liquid Cp cross-check). Solid/liquid densities away
+// from the cited points are engineering estimates, same approximation level as the
+// water/CO2 models above.
+const Iso = { key:"isobutane", label:{en:"Isobutane", ca:"Isobutà"}, formula:"C₄H₁₀",
+  Tt:113.55, Pt:0.019481, Tc:407.8, Pc:36.5e5, Tb:261.44, Pb:101325,
+  M:0.0581222, Cp_s:1200, Cp_l:2231.4, Lfus:78109, Lref:366400,
+  // Pmin must sit below the real triple-point pressure (1.9481e-7 bar) or the
+  // triple point and the low-pressure ends of the vaporization/sublimation
+  // curves near it get clipped out of the plotted range entirely.
+  axis:{Tmin:-180,Tmax:160,Pmin:1e-8,Pmax:100},
+  special:[
+    {key:"triple",T:-159.6,P:1.9481e-7},
+    {key:"critical",T:134.65,P:36.5},
+    {key:"boiling",T:-11.71,P:1.01325}
+  ]
+};
+Iso.vapFit = fitQuad3([{x:1/Iso.Tt,y:Math.log(Iso.Pt)},{x:1/Iso.Tb,y:Math.log(Iso.Pb)},{x:1/Iso.Tc,y:Math.log(Iso.Pc)}]);
+Iso.Pvap = T => Math.exp(Iso.vapFit.a + Iso.vapFit.b/T + Iso.vapFit.c/(T*T));
+Iso.rho_solid = 880;
+// Piecewise liquid density: Tt->Tb anchored near real values, Tb->Tc declining to the
+// real critical density, since a single linear segment across the full range badly
+// underestimates density mid-range for a substance with such a wide Tt-Tc span.
+Iso.rho_liquid = T => T<=Iso.Tb ? 741+(593-741)*(T-Iso.Tt)/(Iso.Tb-Iso.Tt) : 593+(224-593)*(T-Iso.Tb)/(Iso.Tc-Iso.Tb);
+Iso.rho_gas = (T,P) => P*Iso.M/(R*T);
+Iso.v_solid = 1/Iso.rho_solid;
+Iso.v_liquid = 1/Iso.rho_liquid(Iso.Tt);
+Iso.fusSlope = Iso.Lfus/(Iso.Tt*(Iso.v_liquid-Iso.v_solid));
+Iso.Pfus = T => Iso.Pt + Iso.fusSlope*(T-Iso.Tt);
+Iso.Lvap = T => Iso.Lref*Math.pow(Math.max((Iso.Tc-T)/(Iso.Tc-Iso.Tb),0.0001),0.38);
+Iso.Lsub = Iso.Lfus + Iso.Lvap(Iso.Tt);
+Iso.Psub = T => Iso.Pt*Math.exp(-(Iso.Lsub/(R/Iso.M))*(1/T - 1/Iso.Tt));
+Iso.h_solid_T = T => -Iso.Lfus + Iso.Cp_s*(T-Iso.Tt);
+Iso.h_solid = (T,P) => Iso.h_solid_T(T) + Iso.v_solid*(P-Iso.Pt);
+Iso.s_solid = T => -Iso.Lfus/Iso.Tt + Iso.Cp_s*Math.log(T/Iso.Tt);
+Iso.h_liquid_T = T => Iso.Cp_l*(T-Iso.Tt);
+Iso.h_liquid = (T,P) => Iso.h_liquid_T(T) + Iso.v_liquid*(P-Iso.Pt);
+Iso.s_liquid = T => Iso.Cp_l*Math.log(T/Iso.Tt);
+Iso.h_vapor = T => Iso.h_liquid(T, Iso.Pvap(T)) + Iso.Lvap(T);
+Iso.s_vapor = (T,P) => Iso.s_liquid(T) + Iso.Lvap(T)/T - (R/Iso.M)*Math.log(P/Iso.Pvap(T));
+Iso.h_vapor_sub = T => Iso.h_solid(T, Iso.Psub(T)) + Iso.Lsub;
+Iso.s_vapor_sub = (T,P) => Iso.s_solid(T) + Iso.Lsub/T - (R/Iso.M)*Math.log(P/Iso.Psub(T));
+Iso.phase = function(T_K,P_Pa){
+  const EPS=1-1e-6;
+  if (T_K>=this.Tc) return P_Pa>=this.Pc*EPS ? "supercritical" : "gas";
+  if (T_K < this.Tt) return P_Pa >= this.Psub(T_K)*EPS ? "solid" : "gas";
+  const psat=this.Pvap(T_K), pfus=this.Pfus(T_K);
+  if (P_Pa < psat*EPS) return "gas";
+  if (P_Pa < pfus*EPS) return "liquid";
+  return "solid";
+};
+Iso.calc = function(phaseName,T_K,P_Pa){
+  let h,s,rho;
+  if (phaseName==="solid"){ h=this.h_solid(T_K,P_Pa); s=this.s_solid(T_K); rho=this.rho_solid; }
+  else if (phaseName==="liquid"){ h=this.h_liquid(T_K,P_Pa); s=this.s_liquid(T_K); rho=this.rho_liquid(T_K); }
+  else {
+    if (T_K < this.Tt){ h=this.h_vapor_sub(T_K); s=this.s_vapor_sub(T_K,P_Pa); }
+    else { h=this.h_vapor(T_K); s=this.s_vapor(T_K,P_Pa); }
+    rho=this.rho_gas(T_K,P_Pa);
+  }
+  return {phase:phaseName,h,s,g:h-T_K*s,rho};
+};
+Iso.props = function(T_K,P_Pa){ return this.calc(this.phase(T_K,P_Pa),T_K,P_Pa); };
+Iso.facts = {
+  en:[
+    "Isobutane is the fuel in most camping-stove canisters (often blended with propane) &mdash; its boiling point of &minus;11.7&deg;C means it still vaporizes fast enough to burn even on a cold morning.",
+    "As refrigerant \"R-600a\", isobutane has replaced older CFCs and HFCs in most home refrigerators because it has essentially zero ozone-depletion and very low global-warming potential.",
+    "When you use a butane lighter or stove, liquid isobutane evaporates and pulls heat from its surroundings as it does &mdash; that's why a canister feels cold after use, a direct real-world demonstration of the enthalpy/entropy trade-off in &Delta;G."
+  ],
+  ca:[
+    "L'isobutà és el combustible de la majoria de bombones de càmping (sovint barrejat amb propà) &mdash; el seu punt d'ebullició de &minus;11,7&deg;C fa que encara es vaporitzi prou ràpid per cremar fins i tot en un matí fred.",
+    "Com a refrigerant \"R-600a\", l'isobutà ha substituït els antics CFC i HFC a la majoria de neveres domèstiques perquè té un potencial de destrucció de l'ozon pràcticament nul i un potencial d'escalfament global molt baix.",
+    "Quan fas servir un encenedor o fogonet de butà, l'isobutà líquid s'evapora i absorbeix calor del seu entorn en fer-ho &mdash; per això la bombona es nota freda després d'utilitzar-la, una demostració real i directa del compromís entre entalpia i entropia en &Delta;G."
+  ]
+};
+Iso.boundaries = [
+  {fn:Iso.Pvap, tmin:Iso.Tt-273.15, tmax:Iso.Tc-273.15, color:'--liquid-line', type:'vaporization', phases:['liquid','gas']},
+  {fn:Iso.Psub, tmin:Iso.axis.Tmin, tmax:Iso.Tt-273.15, color:'--gas-line', type:'sublimation', phases:['solid','gas']},
+  {fn:Iso.Pfus, tmin:Iso.Tt-273.15, tmax:Iso.Tt-273.15+100, color:'--solid-line', type:'fusion', phases:['solid','liquid']}
+];
+
+const SUBSTANCES = {water:W, co2:C, isobutane:Iso};
+let current = SUBSTANCES.water;
+let selected = null; // {T_C, P_bar}
+
+/* ---------- canvas plotting ---------- */
+const canvas = document.getElementById('plot');
+const ctx = canvas.getContext('2d');
+const margin = {left:52,right:14,top:16,bottom:36};
+let plotW=0, plotH=0, DPR=1;
+
+function resizeCanvas(){
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const cssW = rect.width - 24; // card padding
+  const cssH = Math.max(320, Math.min(460, cssW*0.72));
+  DPR = window.devicePixelRatio || 1;
+  canvas.style.width = cssW+"px";
+  canvas.style.height = cssH+"px";
+  canvas.width = Math.round(cssW*DPR);
+  canvas.height = Math.round(cssH*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  plotW = cssW - margin.left - margin.right;
+  plotH = cssH - margin.top - margin.bottom;
+  draw();
+}
+
+function xToPx(T_C){
+  const {Tmin,Tmax}=current.axis;
+  return margin.left + (T_C-Tmin)/(Tmax-Tmin)*plotW;
+}
+function pxToX(px){
+  const {Tmin,Tmax}=current.axis;
+  return Tmin + (px-margin.left)/plotW*(Tmax-Tmin);
+}
+function yToPx(P_bar){
+  const {Pmin,Pmax}=current.axis;
+  const l0=Math.log10(Pmin), l1=Math.log10(Pmax);
+  const l=Math.log10(Math.max(P_bar,Pmin));
+  return margin.top + (1-(l-l0)/(l1-l0))*plotH;
+}
+function pxToY(px){
+  const {Pmin,Pmax}=current.axis;
+  const l0=Math.log10(Pmin), l1=Math.log10(Pmax);
+  const frac = 1-(px-margin.top)/plotH;
+  return Math.pow(10, l0+frac*(l1-l0));
+}
+
+function niceFmt(v,digits){
+  if (v===0) return "0";
+  const av=Math.abs(v);
+  if (av>=1000) return v.toFixed(0);
+  if (av>=1) return v.toFixed(digits!==undefined?digits:2);
+  if (av>=0.001) return v.toFixed(4);
+  return v.toExponential(2);
+}
+
+/* ---------- two-phase coexistence detection ---------- */
+const COEX_PX_TOL = 15, TRIPLE_PX_TOL = 18;
+function checkCoexistence(T_C,P_bar){
+  const tp = current.special.find(p=>p.key==='triple');
+  if (tp){
+    const dx=xToPx(T_C)-xToPx(tp.T), dy=yToPx(P_bar)-yToPx(tp.P);
+    if (Math.sqrt(dx*dx+dy*dy) < TRIPLE_PX_TOL){
+      return {type:'triple', phases:['solid','liquid','gas'], T_K:current.Tt, P_Pa:current.Pt};
+    }
+  }
+  const tappedPx = xToPx(T_C), tappedPy = yToPx(P_bar);
+  function tryCurve(b){
+    // Hit-test against the SAME polyline that's actually drawn (matching
+    // strokeCurve's N=400 sampling), using point-to-SEGMENT distance rather
+    // than point-to-SAMPLE distance. A pure closest-sample check still fails
+    // for curves that change pressure extremely fast over a tiny T range --
+    // e.g. water's fusion line climbs from ~0.006 bar to 10+ bar within a
+    // few hundredths of a degree of the triple point, so two adjacent
+    // samples can straddle a whole decade of visible pressure on the log
+    // axis while the line between them is still one continuous rendered
+    // segment. Comparing to the segment (not just its endpoints) catches
+    // taps that land visually on that segment.
+    const N = 400;
+    let bestDistSq = Infinity, bestT = null;
+    let prev = null;
+    for (let i=0;i<=N;i++){
+      const Tc = b.tmin + (b.tmax-b.tmin)*i/N;
+      const Pbar = b.fn(Tc+273.15)/1e5;
+      const inRange = Pbar>=current.axis.Pmin && Pbar<=current.axis.Pmax;
+      const pt = inRange ? {Tc, px:xToPx(Tc), py:yToPx(Pbar)} : null;
+      if (pt && prev){
+        const dx=pt.px-prev.px, dy=pt.py-prev.py;
+        const lenSq = dx*dx+dy*dy;
+        let t = lenSq>0 ? ((tappedPx-prev.px)*dx+(tappedPy-prev.py)*dy)/lenSq : 0;
+        t = Math.max(0,Math.min(1,t));
+        const cx=prev.px+t*dx, cy=prev.py+t*dy;
+        const ex=tappedPx-cx, ey=tappedPy-cy;
+        const distSq = ex*ex+ey*ey;
+        if (distSq<bestDistSq){ bestDistSq=distSq; bestT=prev.Tc+(pt.Tc-prev.Tc)*t; }
+      }
+      if (pt){
+        const dx=pt.px-tappedPx, dy=pt.py-tappedPy, d=dx*dx+dy*dy;
+        if (d<bestDistSq){ bestDistSq=d; bestT=pt.Tc; }
+      }
+      prev = pt;
+    }
+    if (bestT!==null && Math.sqrt(bestDistSq) < COEX_PX_TOL){
+      const bestP = b.fn(bestT+273.15)/1e5;
+      return {type:b.type, phases:b.phases.slice(), T_K:bestT+273.15, P_Pa:bestP*1e5};
+    }
+    return null;
+  }
+  for (const b of current.boundaries){
+    const hit = tryCurve(b);
+    if (hit) return hit;
+  }
+  return null;
+}
+const COEX_NOTE = {
+  vaporization: {en:"Liquid and vapor coexist here — like boiling water. Extra heat doesn't raise the temperature, it just converts more liquid into vapor. Notice g is (almost exactly) equal for both — that equality is *why* they can coexist.",
+                 ca:"Aquí coexisteixen el líquid i el vapor — com l'aigua bullint. La calor addicional no augmenta la temperatura, només converteix més líquid en vapor. Fixa't que g és (gairebé exactament) igual per a tots dos — aquesta igualtat és *per què* poden coexistir."},
+  sublimation: {en:"Solid and vapor coexist here — like dry ice \"smoking\" straight to gas. Again, g matches for both phases.",
+                ca:"Aquí coexisteixen el sòlid i el vapor — com el gel sec \"fumejant\" directament cap a gas. De nou, g coincideix per a les dues fases."},
+  fusion: {en:"Solid and liquid coexist here — like ice water. g is very close for both (this simplified model's melting line is a straight-line approximation, so the match is exact right at the triple point and very close nearby).",
+           ca:"Aquí coexisteixen el sòlid i el líquid — com l'aigua amb gel. g és molt semblant per a tots dos (la línia de fusió d'aquest model simplificat és una aproximació lineal, així que la coincidència és exacta just al punt triple i molt propera als voltants)."},
+  triple: {en:"The one exact condition where all three phases coexist at once. Nudge the temperature or pressure even slightly and one phase disappears.",
+           ca:"L'única condició exacta on coexisteixen les tres fases alhora. Si canvies lleugerament la temperatura o la pressió, una fase desapareix."}
+};
+const COEX_TITLE = {
+  vaporization:{en:"Liquid ⇌ Vapor", ca:"Líquid ⇌ Vapor"},
+  sublimation:{en:"Solid ⇌ Vapor", ca:"Sòlid ⇌ Vapor"},
+  fusion:{en:"Solid ⇌ Liquid", ca:"Sòlid ⇌ Líquid"},
+  triple:{en:"Solid ⇌ Liquid ⇌ Vapor", ca:"Sòlid ⇌ Líquid ⇌ Vapor"}
+};
+
+function classifyGrid(){
+  const cols=70, rows=46;
+  const cells=[];
+  for(let i=0;i<cols;i++){
+    for(let j=0;j<rows;j++){
+      const px0=margin.left+i/cols*plotW, px1=margin.left+(i+1)/cols*plotW;
+      const py0=margin.top+j/rows*plotH, py1=margin.top+(j+1)/rows*plotH;
+      const Tc=pxToX((px0+px1)/2), Pb=pxToY((py0+py1)/2);
+      const ph=current.phase(Tc+273.15,Pb*1e5);
+      cells.push({px0,py0,w:px1-px0,h:py1-py0,phase:ph});
+    }
+  }
+  return cells;
+}
+
+const PHASE_COLOR = {solid:'--solid', liquid:'--liquid', gas:'--gas', supercritical:'--sc'};
+const PHASE_LABEL = {
+  solid:{en:'Solid', ca:'Sòlid'},
+  liquid:{en:'Liquid', ca:'Líquid'},
+  gas:{en:'Gas', ca:'Gas'},
+  supercritical:{en:'Supercritical fluid', ca:'Fluid supercrític'}
+};
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+let gridCache=null, gridSub=null;
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.fillStyle="#fffdf8";
+  ctx.fillRect(margin.left,margin.top,plotW,plotH);
+
+  if (!gridCache || gridSub!==current.key){ gridCache=classifyGrid(); gridSub=current.key; }
+  gridCache.forEach(c=>{
+    ctx.fillStyle = cssVar(PHASE_COLOR[c.phase]);
+    ctx.fillRect(c.px0,c.py0,c.w+0.6,c.h+0.6);
+  });
+
+  // boundary curves
+  // Some boundaries (e.g. isobutane's very steep fusion line) leave the plotted
+  // P range partway through their T span. Rather than just dropping the
+  // out-of-range samples (which leaves the line dangling short of the axis
+  // edge), we binary-search the exact crossing point and draw the line all the
+  // way to the axis boundary, so it always looks complete.
+  function strokeCurve(fn, tmin, tmax, color, cap){
+    const hi = cap ? Math.min(cap, current.axis.Pmax) : current.axis.Pmax;
+    const lo = current.axis.Pmin;
+    function isValid(P){ return P>=lo && P<=hi; }
+    const N=400;
+    const pts=[];
+    for(let i=0;i<=N;i++){
+      const T_C = tmin + (tmax-tmin)*i/N;
+      pts.push({T_C, P: fn(T_C+273.15)/1e5});
+    }
+    function crossing(a,b){
+      // binary-search between a and b (one valid, one not) for the exact edge point
+      let aT=a.T_C, bT=b.T_C;
+      const aValid = isValid(a.P);
+      for(let k=0;k<30;k++){
+        const midT=(aT+bT)/2;
+        const midP=fn(midT+273.15)/1e5;
+        if (isValid(midP)===aValid){ aT=midT; } else { bT=midT; }
+      }
+      const edgeT=(aT+bT)/2;
+      let edgeP=fn(edgeT+273.15)/1e5;
+      edgeP=Math.min(Math.max(edgeP,lo),hi);
+      return {T_C:edgeT, P:edgeP};
+    }
+    ctx.beginPath();
+    let started=false;
+    for(let i=0;i<pts.length;i++){
+      const p=pts[i];
+      const v=isValid(p.P);
+      if (v){
+        if (!started && i>0 && !isValid(pts[i-1].P)){
+          const e=crossing(pts[i-1],p);
+          ctx.moveTo(xToPx(e.T_C), yToPx(e.P));
+          started=true;
+        }
+        if (!started){ ctx.moveTo(xToPx(p.T_C), yToPx(p.P)); started=true; }
+        else ctx.lineTo(xToPx(p.T_C), yToPx(p.P));
+      } else if (started && i>0 && isValid(pts[i-1].P)){
+        const e=crossing(pts[i-1],p);
+        ctx.lineTo(xToPx(e.T_C), yToPx(e.P));
+      }
+    }
+    ctx.strokeStyle=color; ctx.lineWidth=3.2; ctx.stroke();
+  }
+  current.boundaries.forEach(b=>{
+    strokeCurve(b.fn, b.tmin, b.tmax, cssVar(b.color), current.axis.Pmax);
+  });
+
+  // special points
+  ctx.font="11px -apple-system,Segoe UI,Roboto,sans-serif";
+  current.special.forEach(pt=>{
+    const px=xToPx(pt.T), py=yToPx(pt.P);
+    ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.fillStyle="#1f2430"; ctx.fill();
+    ctx.beginPath(); ctx.arc(px,py,4,0,7); ctx.strokeStyle="#fff"; ctx.lineWidth=1.4; ctx.stroke();
+  });
+
+  // axes
+  ctx.strokeStyle="#7a7364"; ctx.fillStyle="#5b6472"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(margin.left,margin.top); ctx.lineTo(margin.left,margin.top+plotH); ctx.lineTo(margin.left+plotW,margin.top+plotH); ctx.stroke();
+
+  // x ticks
+  ctx.font="10px -apple-system,Segoe UI,Roboto,sans-serif"; ctx.textAlign="center";
+  const {Tmin,Tmax}=current.axis;
+  const step = (Tmax-Tmin)>300 ? 50 : 20;
+  for(let t=Math.ceil(Tmin/step)*step; t<=Tmax; t+=step){
+    const px=xToPx(t);
+    ctx.strokeStyle="#e7e2d5"; ctx.beginPath(); ctx.moveTo(px,margin.top); ctx.lineTo(px,margin.top+plotH); ctx.stroke();
+    ctx.fillStyle="#5b6472"; ctx.fillText(t+"°", px, margin.top+plotH+14);
+  }
+  ctx.fillText(AXIS_LABEL.t[LANG], margin.left+plotW/2, margin.top+plotH+28);
+
+  // y ticks (log)
+  ctx.textAlign="right";
+  const {Pmin,Pmax}=current.axis;
+  const p0=Math.ceil(Math.log10(Pmin)), p1=Math.floor(Math.log10(Pmax));
+  for(let e=p0;e<=p1;e++){
+    const val=Math.pow(10,e);
+    const py=yToPx(val);
+    ctx.strokeStyle="#e7e2d5"; ctx.beginPath(); ctx.moveTo(margin.left,py); ctx.lineTo(margin.left+plotW,py); ctx.stroke();
+    ctx.fillStyle="#5b6472";
+    const label = val>=1 ? val.toLocaleString() : val.toString();
+    ctx.fillText(label, margin.left-6, py+3);
+  }
+  ctx.save(); ctx.translate(14, margin.top+plotH/2); ctx.rotate(-Math.PI/2); ctx.textAlign="center"; ctx.fillText(AXIS_LABEL.p[LANG],0,0); ctx.restore();
+
+  // selection marker
+  if (selected){
+    const px=xToPx(selected.T_C), py=yToPx(selected.P_bar);
+    ctx.beginPath(); ctx.arc(px,py,7,0,7); ctx.strokeStyle="#e63946"; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px-11,py); ctx.lineTo(px+11,py); ctx.moveTo(px,py-11); ctx.lineTo(px,py+11);
+    ctx.strokeStyle="#e63946"; ctx.lineWidth=1.4; ctx.stroke();
+
+    // on-canvas T/P readout right next to the tapped point, so the exact
+    // selected coordinates are visible at a glance without looking away to
+    // the side panel (helpful on a shared/large display).
+    const lines = ['T = '+selected.T_C.toFixed(1)+'°C', 'P = '+niceFmt(selected.P_bar)+' bar'];
+    ctx.font="12px -apple-system,Segoe UI,Roboto,sans-serif";
+    const lineH = 15, padX = 7, padY = 6;
+    const textW = Math.max(...lines.map(l=>ctx.measureText(l).width));
+    const boxW = textW + padX*2;
+    const boxH = lines.length*lineH + padY*2 - 3;
+    let bx = px + 14, by = py - 14 - boxH;
+    if (bx + boxW > margin.left + plotW) bx = px - 14 - boxW;
+    if (by < margin.top) by = py + 14;
+    bx = Math.max(margin.left, Math.min(bx, margin.left+plotW-boxW));
+    by = Math.max(margin.top, Math.min(by, margin.top+plotH-boxH));
+    ctx.fillStyle = "rgba(31,36,48,0.88)";
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx,by,boxW,boxH,6); else ctx.rect(bx,by,boxW,boxH);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "left";
+    lines.forEach((l,i)=>{ ctx.fillText(l, bx+padX, by+padY+(i+1)*lineH-4); });
+  }
+  ctx.restore();
+}
+
+/* ---------- interaction ---------- */
+function pointFromEvent(evt){
+  const rect = canvas.getBoundingClientRect();
+  const cx = (evt.touches ? evt.touches[0].clientX : evt.clientX) - rect.left;
+  const cy = (evt.touches ? evt.touches[0].clientY : evt.clientY) - rect.top;
+  return {px:cx, py:cy};
+}
+function handleTap(evt){
+  evt.preventDefault();
+  const {px,py} = pointFromEvent(evt);
+  if (px<margin.left || px>margin.left+plotW || py<margin.top || py>margin.top+plotH) return;
+  const T_C = pxToX(px), P_bar = pxToY(py);
+  selected = {T_C,P_bar};
+  document.getElementById('hint').style.display='none';
+  updateReadout();
+  draw();
+}
+canvas.addEventListener('pointerdown', handleTap);
+canvas.addEventListener('pointermove', evt=>{ if (evt.pressure>0 || evt.buttons===1) handleTap(evt); });
+
+function jumpTo(T_C,P_bar){
+  selected={T_C,P_bar};
+  document.getElementById('hint').style.display='none';
+  updateReadout(); draw();
+}
+
+/* ---------- molecule animation ---------- */
+const molCanvas=document.getElementById('mol'), molCtx=molCanvas.getContext('2d');
+let particles=[]; let currentPhases=['gas'];
+const PHASE_DOT = {solid:'#5b84b1', liquid:'#2f8a99', gas:'#c9922c', supercritical:'#8657ab'};
+function initParticles(phases){
+  currentPhases = phases;
+  particles=[];
+  const W_=molCanvas.width, H_=molCanvas.height;
+  const bands = phases.length;
+  const bandW = W_/bands;
+  phases.forEach((phase,bi)=>{
+    const x0 = bandW*bi, x1 = bandW*(bi+1);
+    const N = phase==='solid' ? (bands>1?10:24) : phase==='liquid' ? (bands>1?8:20) : (bands>1?6:14);
+    if (phase==='solid'){
+      const cols = bands>1?3:6, rows=4, sx=(x1-x0)/cols, sy=H_/rows;
+      for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+        const ox=x0+sx*(c+0.5), oy=sy*(r+0.5);
+        particles.push({phase,x:ox,y:oy,ox,oy,vx:0,vy:0});
+      }
+    } else {
+      for(let i=0;i<N;i++){
+        particles.push({phase, x:x0+Math.random()*(x1-x0), y:Math.random()*H_,
+          vx:(Math.random()-0.5)*(phase==='gas'?3.2:1.1), vy:(Math.random()-0.5)*(phase==='gas'?3.2:1.1),
+          xmin:x0+2, xmax:x1-2});
+      }
+    }
+  });
+}
+function animateMol(){
+  const W_=molCanvas.width, H_=molCanvas.height;
+  molCtx.clearRect(0,0,W_,H_);
+  if (currentPhases.length>1){
+    molCtx.strokeStyle="#dcd6c8"; molCtx.setLineDash([3,3]); molCtx.lineWidth=1;
+    const bandW=W_/currentPhases.length;
+    for(let i=1;i<currentPhases.length;i++){ molCtx.beginPath(); molCtx.moveTo(bandW*i,0); molCtx.lineTo(bandW*i,H_); molCtx.stroke(); }
+    molCtx.setLineDash([]);
+  }
+  particles.forEach(p=>{
+    molCtx.fillStyle = PHASE_DOT[p.phase];
+    if (p.phase==='solid'){
+      p.x = p.ox + Math.sin(Date.now()/180 + p.ox)*1.4;
+      p.y = p.oy + Math.cos(Date.now()/180 + p.oy)*1.4;
+    } else {
+      p.x += p.vx; p.y += p.vy;
+      const xmin = p.xmin!==undefined?p.xmin:3, xmax = p.xmax!==undefined?p.xmax:W_-3;
+      if (p.x<xmin||p.x>xmax) p.vx*=-1;
+      if (p.y<3||p.y>H_-3) p.vy*=-1;
+      p.x = Math.max(xmin,Math.min(xmax,p.x));
+      p.y = Math.max(3,Math.min(H_-3,p.y));
+    }
+    molCtx.beginPath(); molCtx.arc(p.x,p.y,4,0,7); molCtx.fill();
+  });
+  requestAnimationFrame(animateMol);
+}
+initParticles(['gas']);
+requestAnimationFrame(animateMol);
+
+/* ---------- readout ---------- */
+// Formats to at least `minSig` significant digits instead of a fixed decimal
+// count, so small magnitudes (e.g. isobutane's gas density at low pressure)
+// don't silently round down to "0.000". Falls back to exponential notation
+// once fixed-point would need an unreasonable number of decimal places.
+function sigFmt(v, baseDecimals, minSig){
+  minSig = minSig || 2;
+  if (v===0) return v.toFixed(baseDecimals);
+  const av = Math.abs(v);
+  const exp = Math.floor(Math.log10(av));
+  const neededDecimals = Math.max(0, minSig - 1 - exp);
+  const decimals = Math.max(baseDecimals, neededDecimals);
+  if (decimals > 6) return v.toExponential(minSig-1);
+  return v.toFixed(decimals);
+}
+function fmtRho(v){ return sigFmt(v, v<1?3:1, 2)+' kg/m³'; }
+function fmtH(v){ return sigFmt(v/1000, 1, 2)+' kJ/kg'; }
+function fmtS(v){ return sigFmt(v, 2, 2)+' J/(kg·K)'; }
+function fmtG(v){ return sigFmt(v/1000, 1, 2)+' kJ/kg'; }
+
+function buildSingleTable(){
+  return '<table class="props" id="propsTable">'+
+    '<tr><td class="k">'+TBL.temperature[LANG]+'</td><td class="v" id="pT">&#8212;</td></tr>'+
+    '<tr><td class="k">'+TBL.pressure[LANG]+'</td><td class="v" id="pP">&#8212;</td></tr>'+
+    '<tr><td class="k">'+TBL.density[LANG]+'</td><td class="v" id="pRho">&#8212;</td></tr>'+
+    '<tr><td class="k">'+TBL.enthalpy[LANG]+'</td><td class="v" id="pH">&#8212;</td></tr>'+
+    '<tr><td class="k">'+TBL.entropy[LANG]+'</td><td class="v" id="pS">&#8212;</td></tr>'+
+    '<tr><td class="k">'+TBL.gibbs[LANG]+'</td><td class="v" id="pG">&#8212;</td></tr>'+
+    '</table>';
+}
+function buildCompareTable(propsList){
+  let head = '<tr><th>'+TBL.property[LANG]+'</th>'+propsList.map(p=>'<th>'+PHASE_LABEL[p.phase][LANG]+'</th>').join('')+'</tr>';
+  function row(label, fmt, key){
+    let cells = propsList.map(p=>'<td>'+fmt(p[key])+'</td>').join('');
+    return '<tr><td>'+label+'</td>'+cells+'</tr>';
+  }
+  let rows = row(TBL.density[LANG],fmtRho,'rho') + row(TBL.enthalpy[LANG],fmtH,'h') + row(TBL.entropy[LANG],fmtS,'s') + row(TBL.gibbs[LANG],fmtG,'g');
+  return '<table class="compare">'+head+rows+'</table>';
+}
+
+function updateReadout(){
+  if (!selected) return;
+  const coex = checkCoexistence(selected.T_C, selected.P_bar);
+  const badge = document.getElementById('phaseBadge');
+  const noteEl = document.getElementById('coexNote');
+  const wrap = document.getElementById('propsWrap');
+
+  if (coex){
+    const propsList = coex.phases.map(ph => current.calc(ph, coex.T_K, coex.P_Pa));
+    badge.innerHTML = COEX_TITLE[coex.type][LANG] + '<span class="sub">'+current.label[LANG]+STR.at[LANG]+(coex.T_K-273.15).toFixed(1)+'°C, '+niceFmt(coex.P_Pa/1e5)+' bar</span>';
+    badge.style.background = '#f2d9b0';
+    noteEl.style.display = 'block';
+    noteEl.textContent = COEX_NOTE[coex.type][LANG];
+    wrap.innerHTML = buildCompareTable(propsList);
+    initParticles(coex.phases);
+  } else {
+    const T_K = selected.T_C+273.15, P_Pa = selected.P_bar*1e5;
+    const r = current.props(T_K,P_Pa);
+    badge.innerHTML = PHASE_LABEL[r.phase][LANG] + '<span class="sub">'+current.label[LANG]+STR.at[LANG]+selected.T_C.toFixed(1)+'°C, '+niceFmt(selected.P_bar)+' bar</span>';
+    badge.style.background = cssVar(PHASE_COLOR[r.phase]);
+    noteEl.style.display = 'none';
+    wrap.innerHTML = buildSingleTable();
+    document.getElementById('pT').textContent = selected.T_C.toFixed(1)+' °C  ('+T_K.toFixed(1)+' K)';
+    document.getElementById('pP').textContent = niceFmt(selected.P_bar)+' bar  ('+niceFmt(selected.P_bar*0.9869)+' atm)';
+    document.getElementById('pRho').textContent = fmtRho(r.rho);
+    document.getElementById('pH').textContent = fmtH(r.h);
+    document.getElementById('pS').textContent = fmtS(r.s);
+    document.getElementById('pG').textContent = fmtG(r.g);
+    initParticles([r.phase]);
+  }
+}
+
+/* ---------- fun facts & special points ---------- */
+function renderFacts(){
+  document.getElementById('facts').innerHTML = '<h3>'+STR.worthKnowing[LANG]+'</h3><ul>'+current.facts[LANG].map(f=>'<li>'+f+'</li>').join('')+'</ul>';
+}
+function renderPtList(){
+  const wrap=document.getElementById('ptList');
+  wrap.innerHTML='';
+  current.special.forEach(pt=>{
+    const b=document.createElement('button');
+    b.className='pt-btn';
+    b.textContent=SPECIAL_LABEL[pt.key][LANG];
+    b.onclick=()=>jumpTo(pt.T,pt.P);
+    wrap.appendChild(b);
+  });
+}
+
+/* ---------- language toggle ---------- */
+function applyLanguage(){
+  document.documentElement.lang = LANG;
+  document.title = STR.title[LANG].replace(/&[a-zA-Z]+;/g,'');
+  document.getElementById('titleText').textContent = STR.title[LANG];
+  document.getElementById('subtitleText').textContent = STR.subtitle[LANG];
+  document.getElementById('hint').innerHTML = STR.hint[LANG];
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.innerHTML = TAB_LABEL[tab.dataset.sub][LANG];
+  });
+  document.getElementById('legSolid').textContent = STR.solid[LANG];
+  document.getElementById('legLiquid').textContent = STR.liquid[LANG];
+  document.getElementById('legGas').textContent = STR.gas[LANG];
+  document.getElementById('legSc').textContent = STR.supercritical[LANG];
+  document.getElementById('gformulaText').innerHTML = STR.gformula[LANG];
+  document.getElementById('footerNote').innerHTML = STR.footer[LANG];
+  document.querySelectorAll('.lang-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.lang===LANG);
+  });
+  renderFacts();
+  renderPtList();
+  if (selected){
+    updateReadout();
+  } else {
+    document.getElementById('phaseBadge').innerHTML = STR.tapPrompt[LANG]+'<span class="sub">'+STR.tapSub[LANG]+'</span>';
+    document.getElementById('propsWrap').innerHTML = buildSingleTable();
+  }
+  draw();
+}
+document.getElementById('langToggle').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.lang-btn');
+  if (!btn || btn.dataset.lang===LANG) return;
+  LANG = btn.dataset.lang;
+  applyLanguage();
+});
+
+/* ---------- substance switching ---------- */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    current = SUBSTANCES[tab.dataset.sub];
+    selected = null;
+    document.getElementById('hint').style.display='block';
+    document.getElementById('phaseBadge').innerHTML=STR.tapPrompt[LANG]+'<span class="sub">'+STR.tapSub[LANG]+'</span>';
+    document.getElementById('phaseBadge').style.background='#f1efe6';
+    document.getElementById('coexNote').style.display='none';
+    document.getElementById('propsWrap').innerHTML=buildSingleTable();
+    initParticles(['gas']);
+    renderFacts(); renderPtList();
+    resizeCanvas();
+  });
+});
+
+applyLanguage();
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+})();
+</script>
+</body>
+</html>
