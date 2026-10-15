@@ -1436,6 +1436,24 @@ function bdraw(){
       bctx.beginPath(); bctx.moveTo(bxToPx(aC),py); bctx.lineTo(bxToPx(bC),py);
       bctx.strokeStyle="#1f2430"; bctx.lineWidth=1.6; bctx.setLineDash([4,3]); bctx.stroke(); bctx.setLineDash([]);
       [aC,bC].forEach(c=>{bctx.beginPath(); bctx.arc(bxToPx(c),py,4.5,0,7); bctx.fillStyle="#1f2430"; bctx.fill(); bctx.lineWidth=1.4; bctx.strokeStyle="#fff"; bctx.stroke();});
+      // amount of each phase (lever rule) labelled on the diagram at each tie-line end
+      const amtLabels = st.kind==='LV'
+        ? [{x:st.xL,t:BSTR.colLiquid[LANG]+' '+pct(st.fLiq),c:cssVar('--liquid-line')},
+           {x:st.yV,t:BSTR.colVapor[LANG]+' '+pct(st.fVap),c:cssVar('--gas-line')}]
+        : [{x:st.a,t:BSTR.colL1[LANG]+' '+pct(st.fa),c:cssVar('--sc-line')},
+           {x:st.b,t:BSTR.colL2[LANG]+' '+pct(st.fb),c:cssVar('--sc-line')}];
+      bctx.font="700 11px -apple-system,Segoe UI,Roboto,sans-serif";
+      amtLabels.forEach(lab=>{
+        const lx=bxToPx(lab.x), w=bctx.measureText(lab.t).width+8;
+        let bx=lx-w/2, by=py-22; if(by<bmargin.top+2) by=py+6;
+        bx=Math.max(bmargin.left, Math.min(bx, bmargin.left+bplotW-w));
+        bctx.fillStyle="rgba(255,253,248,0.92)";
+        if(bctx.roundRect){bctx.beginPath(); bctx.roundRect(bx,by,w,16,4); bctx.fill(); bctx.strokeStyle=lab.c; bctx.lineWidth=1; bctx.stroke();}
+        else bctx.fillRect(bx,by,w,16);
+        bctx.fillStyle=lab.c; bctx.textAlign="center"; bctx.textBaseline="middle";
+        bctx.fillText(lab.t, bx+w/2, by+8);
+      });
+      bctx.textBaseline="alphabetic"; bctx.textAlign="left";
     } else if(st.kind==='LLV'){
       const py=byToPx(yv);
       bctx.beginPath(); bctx.moveTo(bxToPx(st.L1),py); bctx.lineTo(bxToPx(st.L2),py);
